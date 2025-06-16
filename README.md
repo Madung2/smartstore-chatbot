@@ -1,13 +1,13 @@
 ## 실행 명령어
 
 ```
-# 밀버스 실행 (v2.5.3)
-docker compose -f docker-compose.milvus.yml up -d
+.env 파일에 API_KEY=실제apikey
 # 앱 실행
 docker compose up -d
 ```
 > attu
 http://{해당 ip 혹은 도메인}:8001
+Milvus Address= standalone:19530
 
 > fastapi
 http://{해당 ip 혹은 도메인}:8000/docs/
@@ -140,3 +140,9 @@ smartstore-chatbot/
 
 ```
            
+### 전처리
+
+1. column 정리
+column = category, question, answer, keyword
+2. 불필요한 문구 제거
+3. 불필요한 줄바꿈 제거

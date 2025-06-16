@@ -2,11 +2,13 @@ from fastapi import APIRouter
 from app.services.preprocess import SmartstorePreprocessor
 import os
 import glob
+import pandas as pd
 
 router = APIRouter(prefix="/devops")
 
-@router.post("/preprocess") 
+@router.post("/preprocess")
 def run_preprocess():
+    # try:
     input_dir = "app/datasets/csv"
     output_dir = "app/datasets/processed_csv"
     
@@ -22,12 +24,16 @@ def run_preprocess():
             input_path=csv_file,
             output_path=os.path.join(output_dir, filename)
         )
-        num_rows = pre.run()
-        total_rows += num_rows
+        processed_df = pre.run()
+        total_rows += len(processed_df)
+        if not processed_df.empty:
+            sample_data = []
+            for i, row in processed_df.iterrows():
+                sample_data.append(row)
         processed_files.append(
             {
             "filename": filename,
-            "data": pre.preprocess_row(pre.df.iloc[0]) if num_rows > 0 else {}
+            "data": sample_data
         }
         )
         
@@ -36,3 +42,11 @@ def run_preprocess():
         "total_rows": total_rows,
         "processed_files": processed_files
     }
+        
+    # except Exception as e:
+    #     return {
+    #         "message": "Error during preprocessing",
+    #         "error": str(e),
+    #         "total_rows": total_rows if 'total_rows' in locals() else 0,
+    #         "processed_files": processed_files if 'processed_files' in locals() else []
+    #     }

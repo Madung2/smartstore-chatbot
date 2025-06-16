@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import re
 from abc import ABC, abstractmethod
+from typing import List, Dict, Any
+from pandas import DataFrame as df
 
 class BasePreprocessor(ABC):
     """
@@ -28,8 +30,8 @@ class BasePreprocessor(ABC):
             processed.append(self.preprocess_row(row))
         processed_df = pd.DataFrame(processed)
         os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
-        processed_df.to_csv(self.output_path, index=False)
-        return len(processed_df)
+        csv_df = processed_df.to_csv(self.output_path, index=False)
+        return processed_df
 
 class SmartstorePreprocessor(BasePreprocessor):
     """
@@ -45,14 +47,12 @@ class SmartstorePreprocessor(BasePreprocessor):
         super().__init__(input_path, output_path)
 
     def extract_answer(self, text):
-        # "위 도움말이 도움이 되었나요?" 이전 텍스트만 추출
         split_token = "위 도움말이 도움이 되었나요?"
         if split_token in text:
             return text.split(split_token)[0].strip()
         return text.strip()
 
     def extract_keywords(self, text):
-        # "관련 도움말/키워드" ~ "도움말 닫기" 사이 텍스트 추출 후 줄바꿈 split
         start_token = "관련 도움말/키워드"
         end_token = "도움말 닫기"
         keywords = []
@@ -60,18 +60,28 @@ class SmartstorePreprocessor(BasePreprocessor):
             start_idx = text.index(start_token) + len(start_token)
             end_idx = text.index(end_token)
             keyword_block = text[start_idx:end_idx]
-            # 줄바꿈으로 split, 공백/빈줄 제거
             keywords = [kw.strip() for kw in keyword_block.split('\n') if kw.strip()]
-        return keywords
+        return ";".join(keywords)
+
+    def extract_category(self, text):
+        m = re.match(r"^\[(.*?)\]", text)
+        return m.group(1) if m else ""
+
+    def clean_question(self, text):
+        # [카테고리] 태그 제거
+        return re.sub(r"^\[.*?\]\s*", "", text).strip()
 
     def preprocess_row(self, row):
         question = str(row['question']).strip()
         answer_raw = str(row['answer'])
         answer = self.extract_answer(answer_raw)
         keywords = self.extract_keywords(answer_raw)
+        category = self.extract_category(question)
+        clean_q = self.clean_question(question)
         return {
-            "question": question,
+            "category": category,
+            "question": clean_q,
             "answer": answer,
-            "keyword": ";".join(keywords)  # CSV 저장시 리스트 대신 세미콜론 구분 문자열
+            "keyword": keywords
         }
 
