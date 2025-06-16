@@ -1,0 +1,19 @@
+[project]
+name = "smartstore-chatbot"
+version = "0.0.1"
+description = "스마트스토어 챗봇"
+authors = [
+    {name = "tasha",email = "tuliphan91@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi (>=0.115.12,<0.116.0)",
+    "uvicorn[standard] (>=0.34.3,<0.35.0)",
+    "gradio (>=5.34.0,<6.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,43 @@
+services:
+  api:
+    build: .
+    container_name: faq-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+  gradio:
+    build: .
+    container_name: faq-gradio
+    command: poetry run python app/webui.py
+    ports:
+      - "7860:7860"
+    depends_on:
+      - api
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+
+  milvus:
+    image: milvusdb/milvus:v2.3.9
+    container_name: milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    #platform: linux/amd64  # Apple Silicon 호환
+
+#  redis:
+#    image: redis:7
+#    ... (Redis 설정은 추후 추가)
+#  rabbitmq:
+#    image: rabbitmq:3-management
+#    ... (RabbitMQ 설정은 추후 추가)
+
+volumes:
+  milvus_data: 
