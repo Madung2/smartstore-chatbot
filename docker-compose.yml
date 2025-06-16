@@ -11,10 +11,11 @@ services:
       - MILVUS_URL=standalone:19530
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 20s
-      retries: 3
+      retries: 5
+      start_period: 20s
   
   gradio:
     build: .
@@ -31,8 +32,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7860/"]
       interval: 30s
-      timeout: 20s
-      retries: 3
+      timeout: 10s
+      retries: 5
       start_period: 20s
 
   etcd:
@@ -95,7 +96,7 @@ services:
       - "minio"
   attu:
     image: zilliz/attu:v2.3.9
-    container_name: attu
+    container_name: milvus-attu
     environment:
       MILVUS_URL: "standalone:19530"
     ports:

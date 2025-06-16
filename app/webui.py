@@ -11,7 +11,11 @@ def chat_fn(message, history):
             data = response.json()
             answer = data.get("answer", "답변을 찾을 수 없습니다.")
             followup_questions = data.get("followup_questions", [])
-            return f"{answer}\n\n{followup_questions}"
+            if followup_questions:
+                followup_questions_str = "\n".join([f"  - {q}" for q in followup_questions])
+                return f"{answer}\n\n\n\n{followup_questions_str}"
+            else:
+                return answer
         else:
             return f"API 오류: {response.status_code}"
     except Exception as e:
