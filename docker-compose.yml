@@ -21,16 +21,26 @@ services:
     volumes:
       - .:/app
 
-  milvus:
-    image: milvusdb/milvus:v2.3.9
-    container_name: milvus-standalone
-    command: ["milvus", "run", "standalone"]
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    volumes:
-      - milvus_data:/var/lib/milvus
-    #platform: linux/amd64  # Apple Silicon 호환
+  # milvus:
+  #   image: milvusdb/milvus:v2.3.9
+  #   container_name: milvus
+  #   command: ["milvus", "run", "standalone"]
+  #   ports:
+  #     - "19530:19530"
+  #     - "9091:9091"
+  #   volumes:
+  #     - milvus_data:/var/lib/milvus
+  #   platform: linux/amd64  # Apple Silicon 호환
+
+  # attu:
+  #   image: zilliz/attu:v2.3.9
+  #   container_name: attu
+  #   environment:
+  #     MILVUS_URL: "milvus:19530"
+  #   ports:
+  #     - "8001:3000"
+  #   depends_on:
+  #     - milvus
 
 #  redis:
 #    image: redis:7
@@ -39,5 +49,5 @@ services:
 #    image: rabbitmq:3-management
 #    ... (RabbitMQ 설정은 추후 추가)
 
-volumes:
-  milvus_data: 
+# volumes:
+#   milvus_data: 

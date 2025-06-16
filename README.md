@@ -154,6 +154,7 @@ smartstore-chatbot/
 │   │
 │   ├── services/           # 비즈니스 로직 (챗봇, RAG, 임베딩 등)
 │   │   ├── __init__.py
+│   │   ├── preprocess.py
 │   │   ├── chatbot.py
 │   │   ├── rag.py
 │   │   ├── embedding.py
@@ -179,7 +180,10 @@ smartstore-chatbot/
 │   │   ├── config.py
 │   │   ├── logger.py
 │   │   └── exceptions.py
-│   │
+│   │ 
+│   ├──datasets/           # RAG 학습용 데이터셋
+│   │   ├── csv/
+│   │   └── pkl/
 │   ├── main.py             # FastAPI 엔트리포인트
 │   └── webui.py            # Gradio 등 웹UI
 │
