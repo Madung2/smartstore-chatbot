@@ -1,16 +1,16 @@
-import openai
+from openai import OpenAI
 import os
 from app.core.config import settings
 
 class OpenAIEmbedder:
     def __init__(self, model="text-embedding-3-small"):
-        self.api_key = os.environ.get("API_KEY")
-        openai.api_key = self.api_key
         self.model = model
+        self.client = OpenAI()  # 환경변수에서 API 키 자동 인식
 
     def embed(self, text):
-        response = openai.Embedding.create(
+        response = self.client.embeddings.create(
+            model=self.model,
             input=text,
-            model=self.model
+            encoding_format="float"
         )
-        return response['data'][0]['embedding']
+        return response.data[0].embedding

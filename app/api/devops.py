@@ -61,7 +61,7 @@ def embed_csv(filename: str):
     임베딩 생성 및 Milvus 적재
     
     Args:
-        filename (str): 처리할 CSV 파일명
+        filename (str): 처리할 CSV 파일명 (예: final_result.csv )
         
     Returns:
         dict: 임베딩 생성 결과
