@@ -16,15 +16,16 @@ def chat_fn(message, history):
     except Exception as e:
         return f"API 호출 실패: {e}"
 
+# with gr.Blocks(theme=gr.themes.Soft()) as demo:
 demo = gr.ChatInterface(
     fn=chat_fn,
     title="스마트스토어 FAQ 챗봇",
     description="네이버 스마트스토어 FAQ 챗봇입니다. 궁금한 점을 입력해보세요!",
     examples=["배송 조회는 어떻게 하나요?", "환불은 어떻게 받나요?", "스마트스토어 판매자 등록 방법 알려줘"],
-    theme="soft",
+    #theme="soft",
     fill_height=True,
     submit_btn="질문하기"
 )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860) 
+    demo.launch(server_name="0.0.0.0", server_port=7860)
