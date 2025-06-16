@@ -10,7 +10,8 @@ def chat_fn(message, history):
         if response.status_code == 200:
             data = response.json()
             answer = data.get("answer", "답변을 찾을 수 없습니다.")
-            return answer
+            followup_questions = data.get("followup_questions", [])
+            return f"{answer}\n\n{followup_questions}"
         else:
             return f"API 오류: {response.status_code}"
     except Exception as e:
@@ -22,7 +23,7 @@ demo = gr.ChatInterface(
     title="스마트스토어 FAQ 챗봇",
     description="네이버 스마트스토어 FAQ 챗봇입니다. 궁금한 점을 입력해보세요!",
     examples=["배송 조회는 어떻게 하나요?", "환불은 어떻게 받나요?", "스마트스토어 판매자 등록 방법 알려줘"],
-    #theme="soft",
+    theme=gr.themes.Soft(),
     fill_height=True,
     submit_btn="질문하기"
 )

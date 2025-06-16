@@ -13,7 +13,7 @@ Milvus Address= standalone:19530
 http://{해당 ip 혹은 도메인}:8000/docs/
 
 > gradio
-http://{해당 ip 혹은 도메인}:7860
+http://{해당 ip 혹은 도메인}:7860/?__theme=dark
 
 
 ### 1. 전체 구조 및 접근법
@@ -41,16 +41,16 @@ http://{해당 ip 혹은 도메인}:7860
 
 ### 4. Step-by-Step 개발 계획
 1. **데이터 준비**
-    - [ ] `final_result.pkl` 파싱 및 전처리
-    - [ ] FAQ 임베딩 생성 및 Milvus에 저장
+    - [✔️] `final_result.pkl` 파싱 및 전처리
+    - [✔️] FAQ 임베딩 생성 및 Milvus에 저장
 2. **FastAPI 서버 구축**
-    - [ ] 기본 FastAPI 프로젝트 구조 생성
+    - [✔️] 기본 FastAPI 프로젝트 구조 생성
     - [ ] SSE/WebSocket 기반 스트리밍 엔드포인트 구현
     - [ ] 대화 기록 저장 로직(Backend: Redis) 구현
 3. **RAG 파이프라인 구현**
-    - [ ] 질문 임베딩 생성 (비동기: RabbitMQ)
-    - [ ] Milvus에서 유사 FAQ 검색
-    - [ ] LLM(OpenAI)로 답변 생성 (비동기: RabbitMQ)
+    - [✔️] 질문 임베딩 생성 (비동기: RabbitMQ)
+    - [✔️] Milvus에서 유사 FAQ 검색
+    - [✔️] LLM(OpenAI)로 답변 생성 (비동기: RabbitMQ)
     - [ ] 스마트스토어 관련 없는 질문 필터링 로직 구현
     - [ ] 추가 질문(추천 질문) 생성 로직 구현
 4. **성능 최적화 및 테스트**
@@ -59,18 +59,18 @@ http://{해당 ip 혹은 도메인}:7860
     - [ ] 2가지 이상의 질의응답 시나리오 작성 및 테스트
     - [ ] 데모 결과물 정리 (txt/png)
 5. **배포 및 문서화**
-    - [ ] Dockerfile, docker-compose 작성 (Milvus, FastAPI, Redis, RabbitMQ 포함)
+    - [✔️] Dockerfile, docker-compose 작성 (Milvus, FastAPI, Redis, RabbitMQ 포함)
     - [ ] (선택) K8s manifest 작성
-    - [ ] README/노션 문서 작성
+    - [✔️] README/노션 문서 작성
 
 ### 5. 오늘 할일 (1차 목표)
-- [ ] FastAPI 기본 구조 생성
-- [ ] `final_result.pkl` 데이터 파싱 코드 작성
-- [ ] Milvus 도커 환경 세팅 및 연결 테스트
+- [✔️] FastAPI 기본 구조 생성
+- [✔️] `final_result.pkl` 데이터 파싱 코드 작성
+- [✔️] Milvus 도커 환경 세팅 및 연결 테스트
 - [ ] Redis 도커 환경 세팅 및 세션/캐시 구조 설계
 - [ ] RabbitMQ 도커 환경 세팅 및 비동기 태스크 샘플 구현
-- [ ] 임베딩 생성 및 Milvus에 저장
-- [ ] 간단한 FAQ 검색 API 구현 (임베딩 기반)
+- [✔️] 임베딩 생성 및 Milvus에 저장
+- [✔️] 간단한 FAQ 검색 API 구현 (임베딩 기반)
 - [ ] 대화 기록 저장 구조 설계 (Redis)
 - [ ] (시간되면) SSE 기반 스트리밍 응답 샘플 구현
 
