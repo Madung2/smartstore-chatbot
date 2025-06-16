@@ -1,8 +1,14 @@
 import os
+import math
 from pymilvus import (
-    connections, FieldSchema, CollectionSchema, DataType, Collection
+    connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 )
 from app.core.config import settings
+
+def safe_str(val):
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return ""
+    return str(val).strip()
 
 class BaseMilvusRepo:
     def __init__(self, collection_name: str, dim: int = 1536, fields: list = None):
@@ -25,10 +31,17 @@ class BaseMilvusRepo:
         ]
 
     def _get_or_create_collection(self) -> Collection:
-        if self.collection_name in [c.name for c in Collection.list()]:
+        if self.collection_name in utility.list_collections():
             return Collection(self.collection_name)
         schema = CollectionSchema(self.fields, description=f"{self.collection_name} Collection")
         collection = Collection(self.collection_name, schema)
+        # embedding 필드에 인덱스 자동 생성
+        index_params = {
+            "metric_type": "L2",
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 1024}
+        }
+        collection.create_index(field_name="embedding", index_params=index_params)
         return collection
 
     def insert(self, embeddings: list[list[float]], metadatas: list[dict]) -> list[int]:
@@ -36,6 +49,27 @@ class BaseMilvusRepo:
         data = [embeddings]
         result = self.collection.insert(data)
         return result.primary_keys
+
+    def search(self, query_vec, top_k=3):
+        self.collection.load()
+        search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
+        results = self.collection.search(
+            data=[query_vec],
+            anns_field="embedding",
+            param=search_params,
+            limit=top_k,
+            output_fields=["question", "answer", "keyword"]
+        )
+        hits = results[0]
+        return [
+            {
+                "question": hit.entity.get("question"),
+                "answer": hit.entity.get("answer"),
+                "keyword": hit.entity.get("keyword"),
+                "score": hit.distance
+            }
+            for hit in hits
+        ]
 
 class SmartstoreMilvusRepo(BaseMilvusRepo):
     def __init__(self, collection_name: str = "smartstore_faq", dim: int = 1536):
@@ -46,19 +80,19 @@ class SmartstoreMilvusRepo(BaseMilvusRepo):
         return [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
-            FieldSchema(name="category", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="question", dtype=DataType.VARCHAR, max_length=1024),
-            FieldSchema(name="answer", dtype=DataType.VARCHAR, max_length=2048),
-            FieldSchema(name="keyword", dtype=DataType.VARCHAR, max_length=512),
+            FieldSchema(name="answer", dtype=DataType.VARCHAR, max_length=20000),
+            FieldSchema(name="keyword", dtype=DataType.VARCHAR, max_length=2000),
         ]
 
     def insert(self, embeddings: list[list[float]], metadatas: list[dict]) -> list[int]:
         data = [
             embeddings,
-            [m["category"] for m in metadatas],
             [m["question"] for m in metadatas],
             [m["answer"] for m in metadatas],
-            [m["keyword"] for m in metadatas],
+            [safe_str(m.get("keyword")) for m in metadatas]
         ]
         result = self.collection.insert(data)
         return result.primary_keys
+
+    # search는 BaseMilvusRepo의 것을 그대로 사용

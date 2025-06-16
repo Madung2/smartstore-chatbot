@@ -5,8 +5,19 @@ from app.repositories.milvus_repo import SmartstoreMilvusRepo
 import os
 import glob
 import pandas as pd
+from tqdm import tqdm
+import time
+import logging
 
 router = APIRouter(prefix="/devops")
+
+logger = logging.getLogger(__name__)
+
+def build_embedding_input(question: str) -> str:
+    """
+    임베딩 입력 텍스트 생성 함수 (질문만 사용)
+    """
+    return f"{question.strip()}"
 
 @router.post("/preprocess")
 def run_preprocess():
@@ -56,51 +67,66 @@ def run_preprocess():
 
 
 @router.post("/embed")
-def embed_csv(filename: str):
+def embed_csv(filename: str = "final_result.csv", batch_size: int = 100):
     """
-    임베딩 생성 및 Milvus 적재
-    
-    Args:
-        filename (str): 처리할 CSV 파일명 (예: final_result.csv )
-        
-    Returns:
-        dict: 임베딩 생성 결과
-        
-    Raises:
-        HTTPException: 파일 없음 또는 컬럼 없음 예외 처리
+    임베딩 생성 및 Milvus 적재 (배치별로 바로 insert)
     """
-    # 1. 파일 경로 확인
     input_path = os.path.join("app/datasets/processed_csv", filename)
     if not os.path.exists(input_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # 2. CSV 읽기
     df = pd.read_csv(input_path)
-    if "question" not in df.columns:
-        raise HTTPException(status_code=400, detail="No 'question' column in CSV")
+    if "question" not in df.columns or "answer" not in df.columns:
+        raise HTTPException(status_code=400, detail="No 'question' or 'answer' column in CSV")
 
-    # 3. 임베딩 생성
     embedder = OpenAIEmbedder(model="text-embedding-3-small")
-    embeddings = []
-    metadatas = []
-    for _, row in df.iterrows():
-        question = str(row["question"])
-        vector = embedder.embed(question)
-        embeddings.append(vector)
-        # 필요한 메타데이터 컬럼 추가
-        metadatas.append({
-            "category": row.get("category", ""),
-            "question": question,
-            "answer": row.get("answer", ""),
-            "keyword": row.get("keyword", "")
-        })
-
-    # 4. Milvus 적재
     milvus = SmartstoreMilvusRepo(collection_name="smartstore_faq")
-    ids = milvus.insert(embeddings, metadatas)
+
+    questions = df["question"].astype(str).tolist()
+    inputs = [build_embedding_input(q) for q in questions]
+    total = len(inputs)
+    inserted_count = 0
+
+    for i in range(0, total, batch_size):
+        batch_inputs = inputs[i:i+batch_size]
+        batch_metadatas = []
+
+        for j in range(i, min(i+batch_size, total)):
+            row = df.iloc[j]
+            answer = str(row.get("answer", ""))
+            keyword = row.get("keyword", "")
+            # Milvus VARCHAR 필드에서 float NaN -> str('nan') 방지
+            keyword = "" if isinstance(keyword, float) else str(keyword)
+            answer = str(answer)
+            if len(answer) > 10000:
+                answer = answer[:10000]  # 긴 값 잘라주기
+
+            batch_metadatas.append({
+                "question": str(row["question"]),
+                "answer": answer,
+                "keyword": keyword,
+            })
+
+        # Retry loop for rate limits
+        while True:
+            try:
+                batch_vectors = embedder.batch_embed(batch_inputs)
+                break
+            except Exception as e:
+                if hasattr(e, 'status_code') and e.status_code == 429:
+                    logger.warning("Rate limit hit, sleeping 10s...")
+                    time.sleep(10)
+                else:
+                    raise e
+
+        # 바로 Milvus insert
+        milvus.insert(batch_vectors, batch_metadatas)
+        inserted_count += len(batch_vectors)
+
+        logger.info(f"[EMBED] Batch {i//batch_size + 1}/{(total-1)//batch_size + 1} 완료 ({inserted_count}/{total})")
 
     return {
-        "message": "Embedding and insert complete",
+        "message": "Batch embedding + insert complete",
         "file": filename,
-        "inserted": len(ids)
+        "inserted": inserted_count
     }
