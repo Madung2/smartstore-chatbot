@@ -137,6 +137,7 @@
 ### 6. 아키텍처
 
 
+![스크린샷 2025-06-16 오후 2 10 29](https://github.com/user-attachments/assets/8feca44a-3a1c-4b7a-8007-0a70bc3bc5e9)
 
 
 
