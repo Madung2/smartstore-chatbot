@@ -21,7 +21,7 @@ class EmbeddingPipeline:
         return f"{question.strip()}"
 
     def _load_dataframe(self, filename):
-        input_path = os.path.join("app/datasets/processed_csv", filename)
+        input_path = os.path.join("datasets/processed_csv", filename)
         if not os.path.exists(input_path):
             raise HTTPException(status_code=404, detail="File not found")
         df = pd.read_csv(input_path)

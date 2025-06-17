@@ -9,6 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./volumes/logs:/logs
     environment:
       - PYTHONUNBUFFERED=1
       - MILVUS_URL=standalone:19530

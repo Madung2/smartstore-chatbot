@@ -4,7 +4,7 @@ import pandas as pd
 from app.utils.preprocess import SmartstorePreprocessor
 
 class PreprocessPipeline:
-    def __init__(self, input_dir="app/datasets/csv", output_dir="app/datasets/processed_csv"):
+    def __init__(self, input_dir="datasets/csv", output_dir="datasets/processed_csv"):
         self.input_dir = input_dir
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)

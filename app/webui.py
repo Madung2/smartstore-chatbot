@@ -1,29 +1,31 @@
+from fastapi import FastAPI
+from gradio import mount_gradio_app
 import gradio as gr
-import requests
+from app.services.chatbot_service import RAGPipeline
+from app.core.config import settings
+from openai import OpenAI
 
-API_URL = "http://faq-api:8000/chat/"
+llm_client = OpenAI()
+rag = RAGPipeline(llm_client)
 
 def chat_fn(message, history):
-    # FastAPI /chat API에 POST 요청
-    try:
-        response = requests.post(API_URL, params={"question": message})
-        if response.status_code == 200:
-            data = response.json()
-            answer = data.get("answer", "답변을 찾을 수 없습니다.")
-            followup_questions = data.get("followup_questions", [])
-            if followup_questions:
-                followup_questions_str = "\n".join([f"  - {q}" for q in followup_questions])
-                return f"{answer}\n\n\n\n{followup_questions_str}"
-            else:
-                return answer
-        else:
-            return f"API 오류: {response.status_code}"
-    except Exception as e:
-        return f"API 호출 실패: {e}"
+    response = rag.generate_answer(message)
+    return response["answer"]
 
-# with gr.Blocks(theme=gr.themes.Soft()) as demo:
+async def chat_fn_stream(message, history):
+    collected_response = []
+    
+    async for response in rag.generate_answer_stream(message):
+        if response["type"] == "token":
+            collected_response.append(response["content"])
+            # Gradio의 스트리밍을 위해 현재까지의 누적된 텍스트를 yield
+            yield "".join(collected_response)
+        elif response["type"] == "error":
+            yield f"오류가 발생했습니다: {response['content']}"
+            return
+
 demo = gr.ChatInterface(
-    fn=chat_fn,
+    fn=chat_fn_stream,  # 스트리밍 함수로 변경
     title="스마트스토어 FAQ 챗봇",
     description="네이버 스마트스토어 FAQ 챗봇입니다. 궁금한 점을 입력해보세요!",
     examples=["배송 조회는 어떻게 하나요?", "환불은 어떻게 받나요?", "스마트스토어 판매자 등록 방법 알려줘"],

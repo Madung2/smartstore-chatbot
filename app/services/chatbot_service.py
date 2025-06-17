@@ -133,3 +133,100 @@ class RAGPipeline:
                 "similar_questions": [],
                 "followup_questions": []
             }
+
+    async def _call_llm_stream(self, prompt):
+        # LLM 스트리밍 호출
+        try:
+            stream = await self.llm_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                stream=True
+            )
+            return stream
+        except Exception as e:
+            raise RuntimeError(f"LLM 스트리밍 호출 실패: {e}")
+
+    async def generate_answer_stream(self, question, top_k=3):
+        try:
+            # 1. 초기 상태 전송
+            yield {
+                "type": "status",
+                "content": "processing",
+                "stage": "filtering"
+            }
+
+            # 2. 질문 필터링
+            if not self._filter_question(question):
+                yield {
+                    "type": "final",
+                    "answer": "스마트스토어 관련 질문만 답변할 수 있습니다.",
+                    "similar_questions": [],
+                    "followup_questions": []
+                }
+                return
+
+            # 3. 임베딩 & 검색 단계
+            yield {
+                "type": "status",
+                "content": "processing",
+                "stage": "searching"
+            }
+            
+            query_vec = self._embed_question(question)
+            results = self._search_similar_questions(query_vec, top_k=top_k)
+            
+            if not results:
+                yield {
+                    "type": "final",
+                    "answer": "적절한 답변을 찾지 못했습니다.",
+                    "similar_questions": [],
+                    "followup_questions": []
+                }
+                return
+
+            # 4. 컨텍스트 및 프롬프트 준비
+            context = self._build_context(results)
+            prompt = self._build_prompt(context, question)
+
+            # 5. LLM 스트리밍 응답
+            yield {
+                "type": "status",
+                "content": "processing",
+                "stage": "generating"
+            }
+
+            stream = await self._call_llm_stream(prompt)
+            collected_answer = []
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    collected_answer.append(content)
+                    yield {
+                        "type": "token",
+                        "content": content
+                    }
+
+            # 6. Followup 질문 생성
+            yield {
+                "type": "status",
+                "content": "processing",
+                "stage": "followup"
+            }
+
+            followup_questions = self._generate_followup_questions(context)
+
+            # 7. 최종 응답
+            yield {
+                "type": "final",
+                "answer": "".join(collected_answer),
+                "similar_questions": [r["question"] for r in results],
+                "followup_questions": followup_questions
+            }
+
+        except Exception as e:
+            yield {
+                "type": "error",
+                "content": f"RAG 파이프라인 처리 중 오류가 발생했습니다: {e}"
+            }
