@@ -1,9 +1,11 @@
 from app.utils.embedding import OpenAIEmbedder
 from app.repositories.milvus_repo import SmartstoreMilvusRepo
+from openai import AsyncOpenAI
+from app.core.exceptions import *
 
 class RAGPipeline:
-    def __init__(self, llm_client, embedder=None, milvus_repo=None, collection_name="smartstore_faq"):
-        self.llm_client = llm_client
+    def __init__(self, llm_client=None, embedder=None, milvus_repo=None, collection_name="smartstore_faq"):
+        self.llm_client = llm_client or AsyncOpenAI()
         self.embedder = embedder or OpenAIEmbedder(model="text-embedding-3-small")
         self.milvus = milvus_repo or SmartstoreMilvusRepo(collection_name=collection_name)
 
@@ -23,10 +25,10 @@ class RAGPipeline:
             "위 내용을 참고하여, 사용자가 추가로 궁금해할 만한 내용을 챗봇이 직접 질문하는 형태(예: '- 등록에 필요한 서류 안내해드릴까요?')로 2개 제안해줘. 반드시 '- '로 시작하는 한글 질문 형태로만 답변해."
         )
 
-    def _is_smartstore_question_llm(self, question: str) -> bool:
+    async def _is_smartstore_question_llm(self, question: str) -> bool:
         prompt = self.classify_prompt.format(question=question)
         try:
-            completion = self.llm_client.chat.completions.create(
+            completion = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0
@@ -34,61 +36,59 @@ class RAGPipeline:
             answer = completion.choices[0].message.content.strip().upper()
             return answer.startswith("Y")
         except Exception as e:
-            # 분류 실패 시 기본적으로 False 반환
             return False
 
-    def _filter_question(self, question):
-        # 질문 필터링
+    async def _filter_question(self, question) -> bool:
         try:
-            return self._is_smartstore_question_llm(question)
+            return await self._is_smartstore_question_llm(question)
         except Exception as e:
             return False
 
-    def _embed_question(self, question):
-        # 질문 임베딩
+    async def _embed_question(self, question) -> list[float]:
         try:
-            return self.embedder.embed(question)
+            # OpenAIEmbedder가 동기라면 run_in_executor로 비동기화
+            import asyncio
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self.embedder.embed, question)
         except Exception as e:
-            raise RuntimeError(f"임베딩 실패: {e}")
+            raise EmbeddingException(f"임베딩 실패: {e}")
 
-    def _search_similar_questions(self, query_vec, top_k):
-        # 벡터DB에서 질문 검색 =>  top_k개 추출
+    async def _search_similar_questions(self, query_vec, top_k) -> list[dict]:
         try:
-            return self.milvus.search(query_vec, top_k=top_k)
+            # SmartstoreMilvusRepo가 동기라면 run_in_executor로 비동기화
+            import asyncio
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self.milvus.search, query_vec, top_k)
         except Exception as e:
-            raise RuntimeError(f"벡터DB 검색 실패: {e}")
+            raise VectorDBException(f"벡터DB 검색 실패: {e}")
 
-    def _build_context(self, results):
-        # 컨텍스트 문자열 생성
+    async def _build_context(self, results):
         try:
             return "\n\n".join([f"Q: {r['question']}\nA: {r['answer']}" for r in results])
         except Exception as e:
             raise RuntimeError(f"컨텍스트 생성 실패: {e}")
 
-    def _build_prompt(self, context, question):
-        # 컨텍스트와 사용자 질문 더해서 프롬프트 생성
+    async def _build_prompt(self, context, question):
         try:
             return self.answer_prompt.format(context=context, question=question)
         except Exception as e:
-            raise RuntimeError(f"프롬프트 생성 실패: {e}")
+            raise PipelineException(f"프롬프트 생성 실패: {e}")
 
-    def _call_llm(self, prompt):
-        # LLM 호출
+    async def _call_llm(self, prompt):
         try:
-            completion = self.llm_client.chat.completions.create(
+            completion = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
             )
             return completion.choices[0].message.content.strip()
         except Exception as e:
-            raise RuntimeError(f"LLM 호출 실패: {e}")
+            raise LLMException(f"LLM 호출 실패: {e}")
 
-    def _generate_followup_questions(self, context):
-        # 추천질문 생성
+    async def _generate_followup_questions(self, context):
         try:
             prompt = self.followup_prompt.format(context=context)
-            followup_completion = self.llm_client.chat.completions.create(
+            followup_completion = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7
@@ -97,31 +97,24 @@ class RAGPipeline:
             followup_questions = [q.strip("- 0123456789.\n") for q in followup_raw.split("\n") if q.strip()][:2]
             return followup_questions
         except Exception as e:
-            # 추천질문 생성 실패 시 빈 리스트 반환
             return []
 
-    def generate_answer(self, question, top_k=3):
+    async def generate_answer(self, question, top_k=3):
         try:
-            # 0. 질문 필터링
-            if not self._filter_question(question):
+            if not await self._filter_question(question):
                 return {
                     "answer": "스마트스토어 관련 질문만 답변할 수 있습니다.",
                     "similar_questions": [],
                     "followup_questions": []
                 }
-            # 1. 임베딩
-            query_vec = self._embed_question(question)
-            # 2. 벡터DB 검색
-            results = self._search_similar_questions(query_vec, top_k=top_k)
+            query_vec = await self._embed_question(question)
+            results = await self._search_similar_questions(query_vec, top_k=top_k)
             if not results:
                 return {"answer": "적절한 답변을 찾지 못했습니다.", "similar_questions": [], "followup_questions": []}
-            # 3. 프롬프트 생성
-            context = self._build_context(results)
-            prompt = self._build_prompt(context, question)
-            # 4. LLM 호출
-            answer = self._call_llm(prompt)
-            # 5. Followup 생성
-            followup_questions = self._generate_followup_questions(context)
+            context = await self._build_context(results)
+            prompt = await self._build_prompt(context, question)
+            answer = await self._call_llm(prompt)
+            followup_questions = await self._generate_followup_questions(context)
             return {
                 "answer": answer,
                 "similar_questions": [r["question"] for r in results],
@@ -135,7 +128,6 @@ class RAGPipeline:
             }
 
     async def _call_llm_stream(self, prompt):
-        # LLM 스트리밍 호출
         try:
             stream = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -145,60 +137,34 @@ class RAGPipeline:
             )
             return stream
         except Exception as e:
-            raise RuntimeError(f"LLM 스트리밍 호출 실패: {e}")
+            raise LLMException(f"LLM 스트리밍 호출 실패: {e}")
 
     async def generate_answer_stream(self, question, top_k=3):
         try:
-            # 1. 초기 상태 전송
-            yield {
-                "type": "status",
-                "content": "processing",
-                "stage": "filtering"
-            }
-
-            # 2. 질문 필터링
-            if not self._filter_question(question):
+            #yield {"type": "debug", "content": "generate_answer_stream 진입"}
+            yield {"type": "status", "content": "processing", "stage": "filtering"}
+            if not await self._filter_question(question):
                 yield {
-                    "type": "final",
+                    "type": "final-error",
                     "answer": "스마트스토어 관련 질문만 답변할 수 있습니다.",
                     "similar_questions": [],
                     "followup_questions": []
                 }
-                return
-
-            # 3. 임베딩 & 검색 단계
-            yield {
-                "type": "status",
-                "content": "processing",
-                "stage": "searching"
-            }
-            
-            query_vec = self._embed_question(question)
-            results = self._search_similar_questions(query_vec, top_k=top_k)
-            
+            yield {"type": "status", "content": "processing", "stage": "searching"}
+            query_vec = await self._embed_question(question)
+            results = await self._search_similar_questions(query_vec, top_k=top_k)
             if not results:
                 yield {
-                    "type": "final",
+                    "type": "final-error",
                     "answer": "적절한 답변을 찾지 못했습니다.",
                     "similar_questions": [],
                     "followup_questions": []
                 }
-                return
-
-            # 4. 컨텍스트 및 프롬프트 준비
-            context = self._build_context(results)
-            prompt = self._build_prompt(context, question)
-
-            # 5. LLM 스트리밍 응답
-            yield {
-                "type": "status",
-                "content": "processing",
-                "stage": "generating"
-            }
-
+            context = await self._build_context(results)
+            prompt = await self._build_prompt(context, question)
+            #yield {"type": "status", "content": "processing", "stage": "generating"}
             stream = await self._call_llm_stream(prompt)
             collected_answer = []
-            
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
@@ -207,24 +173,14 @@ class RAGPipeline:
                         "type": "token",
                         "content": content
                     }
-
-            # 6. Followup 질문 생성
+            #yield {"type": "status", "content": "processing", "stage": "followup"}
+            followup_questions = await self._generate_followup_questions(context)
             yield {
-                "type": "status",
-                "content": "processing",
-                "stage": "followup"
-            }
-
-            followup_questions = self._generate_followup_questions(context)
-
-            # 7. 최종 응답
-            yield {
-                "type": "final",
+                "type": "final-success",
                 "answer": "".join(collected_answer),
                 "similar_questions": [r["question"] for r in results],
                 "followup_questions": followup_questions
             }
-
         except Exception as e:
             yield {
                 "type": "error",

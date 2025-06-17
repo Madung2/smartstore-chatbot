@@ -1,11 +1,9 @@
-from fastapi import FastAPI
-from gradio import mount_gradio_app
 import gradio as gr
 from app.services.chatbot_service import RAGPipeline
 from app.core.config import settings
-from openai import OpenAI
+from openai import AsyncOpenAI
 
-llm_client = OpenAI()
+llm_client = AsyncOpenAI()
 rag = RAGPipeline(llm_client)
 
 def chat_fn(message, history):
@@ -13,16 +11,24 @@ def chat_fn(message, history):
     return response["answer"]
 
 async def chat_fn_stream(message, history):
-    collected_response = []
-    
+    collected = []
     async for response in rag.generate_answer_stream(message):
         if response["type"] == "token":
-            collected_response.append(response["content"])
-            # Gradio의 스트리밍을 위해 현재까지의 누적된 텍스트를 yield
-            yield "".join(collected_response)
-        elif response["type"] == "error":
-            yield f"오류가 발생했습니다: {response['content']}"
-            return
+            collected.append(response["content"])
+            yield "".join(collected)  # ✅ 누적된 전체 텍스트를 yield
+        elif response["type"] == "final-error":
+            yield response["answer"]
+            break
+        elif response["type"] == "final-success":
+            answer = response["answer"]
+            # 관련 질문 2, 3번 추출 (0번은 현재 질문과 동일할 수 있으니 1, 2번만)
+            related_questions = response.get("similar_questions", [])[1:3]
+            if related_questions:
+                related_str = "\n\n[관련 질문]\n" + "\n".join([f"- {q}" for q in related_questions])
+            else:
+                related_str = ""
+            yield answer + related_str
+            break
 
 demo = gr.ChatInterface(
     fn=chat_fn_stream,  # 스트리밍 함수로 변경

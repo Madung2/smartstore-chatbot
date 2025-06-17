@@ -6,7 +6,7 @@ services:
     image: smartstore-chatbot:1.0.0
     container_name: faq-api
     ports:
-      - "8000:8000"
+      - "8000:8000" # fastapi
     volumes:
       - .:/app
       - ./volumes/logs:/logs
@@ -22,15 +22,17 @@ services:
       start_period: 20s
   
   gradio:
-    image: smartstore-chatbot:1.0.0
+    image: smartstore-chatbot:1.0.0 # 리소스 조금더 쓰더라도 빠르게 fastapi RAG 호출하기 위해 같은 이미지 사용
     container_name: faq-gradio
-    command: poetry run python app/webui.py
+    command: python app/webui.py
     ports:
       - "7860:7860"
     depends_on:
       - api
     environment:
       - PYTHONUNBUFFERED=1
+      - MILVUS_URL=standalone:19530
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - .:/app
     healthcheck:

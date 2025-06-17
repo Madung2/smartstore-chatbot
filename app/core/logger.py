@@ -39,6 +39,7 @@ file_handler = TimedRotatingFileHandler(
 file_handler.suffix = "%Y-%m-%d"
 
 file_handler.setFormatter(log_format)
+file_handler.flush = True
 logger.addHandler(file_handler)
 
 # 다른 모듈에서 import할 수 있도록 logger 인스턴스 export
