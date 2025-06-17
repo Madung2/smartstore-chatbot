@@ -1,9 +1,10 @@
 import os
 import math
 from pymilvus import (
-    connections, FieldSchema, CollectionSchema, DataType, Collection, utility
+    connections, CollectionSchema, Collection, utility
 )
 from app.core.config import settings
+from app.schemas.milvus_smartstore_faq import smartstore_fields, base_fields
 
 def safe_str(val):
     if val is None or (isinstance(val, float) and math.isnan(val)):
@@ -20,15 +21,8 @@ class BaseMilvusRepo:
         connections.connect(host=host, port=port)
         self.collection_name = collection_name
         self.dim = dim
-        self.fields = fields or self.default_fields()
+        self.fields = fields or base_fields(dim)
         self.collection = self._get_or_create_collection()
-
-    def default_fields(self):
-        # 기본 필드(상속받아 오버라이드)
-        return [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=self.dim),
-        ]
 
     def _get_or_create_collection(self) -> Collection:
         if self.collection_name in utility.list_collections():
@@ -73,17 +67,7 @@ class BaseMilvusRepo:
 
 class SmartstoreMilvusRepo(BaseMilvusRepo):
     def __init__(self, collection_name: str = "smartstore_faq", dim: int = 1536):
-        super().__init__(collection_name, dim, fields=self.smartstore_fields(dim))
-
-    @staticmethod
-    def smartstore_fields(dim):
-        return [
-            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim),
-            FieldSchema(name="question", dtype=DataType.VARCHAR, max_length=1024),
-            FieldSchema(name="answer", dtype=DataType.VARCHAR, max_length=20000),
-            FieldSchema(name="keyword", dtype=DataType.VARCHAR, max_length=2000),
-        ]
+        super().__init__(collection_name, dim, fields=smartstore_fields(dim))
 
     def insert(self, embeddings: list[list[float]], metadatas: list[dict]) -> list[int]:
         data = [

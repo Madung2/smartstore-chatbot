@@ -1,5 +1,7 @@
 ## 실행 명령어
 
+
+
 ```
 .env 파일에 OPENAI_API_KEY=실제apikey
 # 앱 실행
