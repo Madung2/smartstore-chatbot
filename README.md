@@ -1,5 +1,7 @@
 ## 실행 명령어
 
+![스크린샷 2025-06-17 오후 1 22 52](https://github.com/user-attachments/assets/4a7bb210-7f69-41f9-8243-8cc2937e4fdc)
+
 
 
 ```
