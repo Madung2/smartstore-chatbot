@@ -5,16 +5,24 @@ from openai import AsyncOpenAI
 import websocket
 import json
 import requests
+import time
+
 
 llm_client = AsyncOpenAI()
 rag = RAGPipeline(llm_client)
 
-WS_API_URL = "ws://api:8000/chat/ws"  # 도커 네트워크에서 api 컨테이너 이름 사용
-HISTORY_API_URL = "http://api:8000/user/history"
 
-def ws_connect():
+API_URL = "api:8000"
+WS_API_URL = f"ws://{API_URL}/chat/ws"
+SESSION_API_URL = f"http://{API_URL}/user/session"
+NEW_SESSION_API_URL = f"http://{API_URL}/user/new_session"
+
+
+
+
+def ws_connect(sessionid=None):
     print("[WebSocket] Connecting to:", WS_API_URL)
-    ws = websocket.create_connection(WS_API_URL)
+    ws = websocket.create_connection(WS_API_URL, sessionid=f"{sessionid}")
     print("[WebSocket] Connected!")
     return ws
 
@@ -27,7 +35,11 @@ def chat_fn(message, history):
     response = rag.generate_answer(message)
     return response["answer"]
 
-async def chat_fn_stream(message, history):
+
+async def chat_fn_stream(message):
+    """
+    유저 정보 저장 없이 작동하는 챗봇 함수
+    """
     collected = []
     async for response in rag.generate_answer_stream(message):
         if response["type"] == "token":
@@ -47,11 +59,15 @@ async def chat_fn_stream(message, history):
             yield answer + related_str
             break
 
-def ws_chat_stream(message, history):
+def ws_chat_stream(message, sessionid=None):
+    """
+    웹소켓 사용하여 유저 정보 저장 있는 챗봇 함수
+    """
     print(f"[WebSocket] ws_chat_stream called with message: {message}")
-    ws = ws_connect()
+    ws = ws_connect(sessionid)
     collected = []
     try:
+        start = time.time()
         ws.send(json.dumps({"question": message, "top_k": 3}))
         print("[WebSocket] Sent question to server.")
         while True:
@@ -63,13 +79,14 @@ def ws_chat_stream(message, history):
                     collected.append(data["content"])
                     yield "".join(collected)
                 elif data.get("type") in ("final", "final-success"):
+
                     answer = data["answer"]
                     related_questions = data.get("similar_questions", [])[1:3]
                     if related_questions:
                         related_str = "\n\n[관련 질문]\n" + "\n".join([f"- {q}" for q in related_questions])
                     else:
-                        related_str = ""
-                    yield answer + related_str
+                        related_str = ""    
+                    yield answer + related_str + f"\n\n⏱ 처리 시간: {time.time() - start:.2f}초"
                     break
                 elif data.get("type") == "final-error":
                     yield data["answer"]
@@ -84,34 +101,44 @@ def ws_chat_stream(message, history):
     finally:
         ws_close(ws)
 
-# JS 코드: 페이지 로드 시 /user/session 엔드포인트를 자동 호출
-auto_session_js = """
-(async () => {
-    try {
-        await fetch('/user/session', {credentials: 'include'});
-    } catch (e) {
-        // 무시
-    }
-})();
-"""
 
-def clear_history():
+
+
+def check_session():
     try:
-        resp = requests.delete(HISTORY_API_URL, cookies=None)
+        resp = requests.get(SESSION_API_URL, cookies=None)
         if resp.status_code == 200:
-            # JS로 새로고침 트리거
-            return gr.HTML("<script>location.reload();</script>")
+
+            return f"{resp.json()['sessionid']}"
         else:
-            return gr.HTML("<span style='color:red'>이력 삭제 실패</span>")
+            return "세션 없음"
     except Exception as e:
-        return gr.HTML(f"<span style='color:red'>에러: {e}</span>")
+        return f"에러: {e}"
+
+
+def new_session():
+    resp = requests.get(NEW_SESSION_API_URL, cookies=None)
+    if resp.status_code == 200:
+        return f"{resp.json()['sessionid']}"
+    else:
+        return "세션 생성 실패"
 
 demo = gr.Blocks()
-with demo:
-    clear_btn = gr.Button("이전 대화 기록 삭제")
-    clear_output = gr.HTML()
-    clear_btn.click(clear_history, outputs=clear_output)
-    gr.HTML(f"<script>{auto_session_js}</script>")
+with demo:    
+    # sessionid = check_session()  # 💡 페이지 로드시 한 번만 실행됨
+    # clear_btn = gr.Button("이전 대화 기록 삭제")
+    # sessionid = gr.Markdown(f"현재 세션 ID: `{sessionid}`")  # 화면에 표시
+    # clear_btn.click(new_session, outputs=sessionid)
+
+    sessionid_state = gr.State(new_session())  # 최초 세션ID
+    sessionid_display = gr.Markdown()          # 화면에 표시
+
+    def update_sessionid():
+        new_id = new_session()
+        return new_id, new_id  # state, display 둘 다 갱신
+
+    clear_btn = gr.Button("세션ID 새로고침")
+    clear_btn.click(update_sessionid, outputs=[sessionid_state, sessionid_display])
     gr.ChatInterface(
         fn=ws_chat_stream,
         title="스마트스토어 FAQ 챗봇",

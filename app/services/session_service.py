@@ -1,5 +1,5 @@
 import uuid
-from app.repositories.redis_repo import RedisRepo
+from app.repositories.redis_repo import RedisHistoryRepo
 from fastapi import Request
 
 class SessionService:
@@ -9,10 +9,10 @@ class SessionService:
         Args:
             redis_repo: Redis 저장소 인스턴스. None인 경우 새로 생성
         """
-        self.redis = redis_repo or RedisRepo()
-        self.key_prefix = "session:{session_id}:history"
+        self.redis = redis_repo or RedisHistoryRepo()
+        self.key_prefix = "session:{sessionid}:history"
 
-    def get_or_create_session_id(self, request: Request, response=None):
+    def get_or_create_sessionid(self, request: Request, response=None):
         """
         요청에서 세션 ID를 가져오거나 새로 생성
         Args:
@@ -21,30 +21,30 @@ class SessionService:
         Returns:
             str: 세션 ID
         """
-        session_id = request.cookies.get("session_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
+        sessionid = request.cookies.get("sessionid")
+        if not sessionid:
+            sessionid = str(uuid.uuid4())
             if response is not None:
-                response.set_cookie(key="session_id", value=session_id, httponly=True)
-        return session_id
+                response.set_cookie(key="sessionid", value=sessionid, httponly=True)
+        return sessionid
 
-    def get_history(self, session_id):
+    def get_history(self, sessionid):
         """
         주어진 세션의 대화 기록을 조회
         """
-        key = self.key_prefix.format(session_id=session_id)
+        key = self.key_prefix.format(sessionid=sessionid)
         return self.redis.get_history(key)
 
-    def append_history(self, session_id, message, answer):
+    def append_history(self, sessionid, message, answer):
         """
         세션의 대화 기록에 새로운 대화를 추가
         """
-        key = self.key_prefix.format(session_id=session_id)
+        key = self.key_prefix.format(sessionid=sessionid)
         self.redis.append_history(key, message, answer)
 
-    def clear_history(self, session_id):
+    def clear_history(self, sessionid):
         """
         세션의 대화 기록을 모두 삭제
         """
-        key = self.key_prefix.format(session_id=session_id)
+        key = self.key_prefix.format(sessionid=sessionid)
         self.redis.clear_history(key)
