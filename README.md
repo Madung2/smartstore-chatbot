@@ -1,3 +1,22 @@
+# 스마트스토어 RAG llm 챗봇
+
+---
+# 질의응답 데모 
+
+![판매자 등록 방법](https://github.com/user-attachments/assets/adadca2b-5d06-4f17-a0ce-076baf20aed6)
+판매자 등록 방법
+
+![배송조회](https://github.com/user-attachments/assets/0111fca5-6ba0-4a4a-9fb5-dceea3ee22f4)
+배송조회
+
+![관련없는질문](https://github.com/user-attachments/assets/1a0751a6-809d-4924-af01-3f5bb4abad29)
+관련없는 질문
+
+![상호명기억해후속응답](https://github.com/user-attachments/assets/133d9a0d-60b5-41be-aae8-c59a2b75f7dd)
+세션 기준으로 사용자 데이터 기억해 후속 응답
+
+
+
 ## 실행 명령어
 
 ![스크린샷 2025-06-17 오후 1 22 52](https://github.com/user-attachments/assets/4a7bb210-7f69-41f9-8243-8cc2937e4fdc)
