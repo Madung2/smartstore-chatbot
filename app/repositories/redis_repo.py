@@ -1,10 +1,12 @@
 import redis
+import os
 from app.core.config import settings
 
 class RedisRepo:
     def __init__(self, url=None):
-        self.url = url or settings.redis_url or "redis://redis:6379/0"
+        self.url = url or os.getenv("REDIS_URL", "redis://redis:6379/0")
         self.client = redis.Redis.from_url(self.url, decode_responses=True)
+        self.expire_seconds = 60 * 60 * 24 * 3  # 3일 # 이후에는 기록 안 남도록
 
     def get_history(self, key):
         return self.client.lrange(key, 0, -1)
@@ -12,6 +14,9 @@ class RedisRepo:
     def append_history(self, key, message, answer):
         entry = f"{message}|||{answer}"
         self.client.rpush(key, entry)
+        # 만약 expire가 안 걸려 있으면 7일로 설정
+        if self.client.ttl(key) == -1:
+            self.client.expire(key, self.expire_seconds)
 
     def clear_history(self, key):
         self.client.delete(key)

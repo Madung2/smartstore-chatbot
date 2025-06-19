@@ -4,11 +4,13 @@ from app.core.config import settings
 from openai import AsyncOpenAI
 import websocket
 import json
+import requests
 
 llm_client = AsyncOpenAI()
 rag = RAGPipeline(llm_client)
 
 WS_API_URL = "ws://api:8000/chat/ws"  # 도커 네트워크에서 api 컨테이너 이름 사용
+HISTORY_API_URL = "http://api:8000/user/history"
 
 def ws_connect():
     print("[WebSocket] Connecting to:", WS_API_URL)
@@ -82,15 +84,44 @@ def ws_chat_stream(message, history):
     finally:
         ws_close(ws)
 
-demo = gr.ChatInterface(
-    fn=ws_chat_stream,
-    title="스마트스토어 FAQ 챗봇",
-    description="네이버 스마트스토어 FAQ 챗봇입니다. 궁금한 점을 입력해보세요!",
-    examples=["배송 조회는 어떻게 하나요?", "환불은 어떻게 받나요?", "스마트스토어 판매자 등록 방법 알려줘"],
-    theme=gr.themes.Soft(),
-    fill_height=True,
-    submit_btn="질문하기"
-)
+# JS 코드: 페이지 로드 시 /user/session 엔드포인트를 자동 호출
+auto_session_js = """
+(async () => {
+    try {
+        await fetch('/user/session', {credentials: 'include'});
+    } catch (e) {
+        // 무시
+    }
+})();
+"""
+
+def clear_history():
+    try:
+        resp = requests.delete(HISTORY_API_URL, cookies=None)
+        if resp.status_code == 200:
+            # JS로 새로고침 트리거
+            return gr.HTML("<script>location.reload();</script>")
+        else:
+            return gr.HTML("<span style='color:red'>이력 삭제 실패</span>")
+    except Exception as e:
+        return gr.HTML(f"<span style='color:red'>에러: {e}</span>")
+
+demo = gr.Blocks()
+with demo:
+    clear_btn = gr.Button("이전 대화 기록 삭제")
+    clear_output = gr.HTML()
+    clear_btn.click(clear_history, outputs=clear_output)
+    gr.HTML(f"<script>{auto_session_js}</script>")
+    gr.ChatInterface(
+        fn=ws_chat_stream,
+        title="스마트스토어 FAQ 챗봇",
+        description="네이버 스마트스토어 FAQ 챗봇입니다. 궁금한 점을 입력해보세요!",
+        examples=["배송 조회는 어떻게 하나요?", "환불은 어떻게 받나요?", "스마트스토어 판매자 등록 방법 알려줘"],
+        theme=gr.themes.Soft(),
+        fill_height=True,
+        submit_btn="질문하기"
+    )
+
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)

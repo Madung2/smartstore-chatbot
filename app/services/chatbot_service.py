@@ -112,7 +112,7 @@ class RAGPipeline:
         except Exception as e:
             return []
 
-    async def generate_answer(self, question, top_k=3):
+    async def generate_answer(self, question, top_k=3, context=None):
         print(f"[DEBUG] generate_answer called with: {question}")
         try:
             if not await self._filter_question(question):
@@ -127,12 +127,16 @@ class RAGPipeline:
             if not results:
                 print(f"[DEBUG] No similar questions found.")
                 return {"answer": "적절한 답변을 찾지 못했습니다.", "similar_questions": [], "followup_questions": []}
-            context = await self._build_context(results)
-            prompt = await self._build_prompt(context, question)
+            milvus_context = await self._build_context(results)
+            # context(세션 기반)가 있으면 프롬프트에 우선적으로 포함
+            if context:
+                prompt = f"이전 대화:\n{context}\n\n{milvus_context}\n\n질문: {question}\n답변:"
+            else:
+                prompt = await self._build_prompt(milvus_context, question)
             print(f"[DEBUG] LLM answer prompt: {prompt}")
             answer = await self._call_llm(prompt)
             print(f"[DEBUG] LLM answer: {answer}")
-            followup_questions = await self._generate_followup_questions(context)
+            followup_questions = await self._generate_followup_questions(milvus_context)
             print(f"[DEBUG] followup_questions: {followup_questions}")
             return {
                 "answer": answer,
@@ -159,7 +163,7 @@ class RAGPipeline:
         except Exception as e:
             raise LLMException(f"LLM 스트리밍 호출 실패: {e}")
 
-    async def generate_answer_stream(self, question, top_k=3):
+    async def generate_answer_stream(self, question, top_k=3, user_history=None):
         print(f"[DEBUG] generate_answer_stream called with: {question}")
         try:
             yield {"type": "status", "content": "processing", "stage": "filtering"}
@@ -184,8 +188,19 @@ class RAGPipeline:
                     "followup_questions": []
                 }
                 return
-            context = await self._build_context(results)
-            prompt = await self._build_prompt(context, question)
+            faq_context = await self._build_context(results)
+            # 프롬프트 생성
+            if user_history:
+                prompt = (
+                    f"[이전 대화 이력]\n{user_history}\n\n"
+                    f"[스마트스토어 FAQ/지식]\n{faq_context}\n\n"
+                    f"[질문]\n{question}\n\n[답변]"
+                )
+            else:
+                prompt = (
+                    f"[스마트스토어 FAQ/지식]\n{faq_context}\n\n"
+                    f"[질문]\n{question}\n\n[답변]"
+                )
             print(f"[DEBUG] LLM answer prompt [stream]: {prompt}")
             stream = await self._call_llm_stream(prompt)
             collected_answer = []
@@ -197,7 +212,7 @@ class RAGPipeline:
                         "type": "token",
                         "content": content
                     }
-            followup_questions = await self._generate_followup_questions(context)
+            followup_questions = await self._generate_followup_questions(faq_context)
             print(f"[DEBUG] followup_questions [stream]: {followup_questions}")
             yield {
                 "type": "final-success",
