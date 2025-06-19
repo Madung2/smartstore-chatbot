@@ -13,7 +13,7 @@ def safe_str(val):
 
 class BaseMilvusRepo:
     def __init__(self, collection_name: str, dim: int = 1536, fields: list = None):
-        milvus_url = settings.milvus_url
+        milvus_url = settings.milvus_url or os.getenv("MILVUS_URL", "standalone:19530")
         if ":" in milvus_url:
             host, port = milvus_url.split(":")
         else:

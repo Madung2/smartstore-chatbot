@@ -14,8 +14,8 @@ class RedisHistoryRepo:
     def get_history(self, key):
         return self.client.lrange(key, 0, -1)
 
-    def append_history(self, key, message, answer):
-        entry = f"{message}|||{answer}"
+    def append_history(self, key, message):
+        entry = f"{message}"
         self.client.rpush(key, entry)
         # 만약 expire가 안 걸려 있으면 7일로 설정
         if self.client.ttl(key) == -1:
@@ -35,17 +35,21 @@ class RedisStreamRepo:
         self.client = redis.Redis.from_url(self.url, decode_responses=True)
         self.expire_seconds = expire_seconds
         self.task_id = task_id
-        self.key = "chat:stream:{task_id}"
+
+        # 키 생성
+        self.key = f"chat:stream:{self.task_id}"
 
     def push_token(self, token):
         key = self.key
         self.client.rpush(key, token)
+        self.client.publish(key, token)
         if self.client.ttl(key) == -1:
             self.client.expire(key, self.expire_seconds)
 
     def push_end(self):
         key = self.key
         self.client.rpush(key, "[END]")
+        self.client.publish(key, "[END]")
 
     def get_tokens(self):
         key = self.key

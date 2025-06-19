@@ -35,12 +35,12 @@ class SessionService:
         key = self.key_prefix.format(sessionid=sessionid)
         return self.redis.get_history(key)
 
-    def append_history(self, sessionid, message, answer):
+    def append_history(self, sessionid, message, question):
         """
         세션의 대화 기록에 새로운 대화를 추가
         """
         key = self.key_prefix.format(sessionid=sessionid)
-        self.redis.append_history(key, message, answer)
+        self.redis.append_history(key, message, question)
 
     def clear_history(self, sessionid):
         """

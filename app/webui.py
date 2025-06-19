@@ -61,43 +61,36 @@ async def chat_fn_stream(message):
 
 def ws_chat_stream(message, sessionid=None):
     """
-    웹소켓 사용하여 유저 정보 저장 있는 챗봇 함수
+    Pub/Sub 기반 토큰 스트리밍 챗봇 함수
     """
     print(f"[WebSocket] ws_chat_stream called with message: {message}")
     ws = ws_connect(sessionid)
     collected = []
     try:
         start = time.time()
+        # 질문 전송
         ws.send(json.dumps({"question": message, "top_k": 3}))
         print("[WebSocket] Sent question to server.")
+        # 1. task_id 먼저 수신
+        task_id_msg = ws.recv()
+        try:
+            task_id = json.loads(task_id_msg)["task_id"]
+            print(f"[WebSocket] Received task_id: {task_id}")
+        except Exception:
+            print(f"[WebSocket] Unexpected first message: {task_id_msg}")
+            yield f"[에러] 서버에서 task_id를 받지 못했습니다."
+            return
+        # 2. 토큰 스트림 수신
         while True:
-            try:
-                response = ws.recv()
-                print(f"[WebSocket] Received: {response}")
-                data = json.loads(response)
-                if data.get("type") == "token":
-                    collected.append(data["content"])
-                    yield "".join(collected)
-                elif data.get("type") in ("final", "final-success"):
-
-                    answer = data["answer"]
-                    related_questions = data.get("similar_questions", [])[1:3]
-                    if related_questions:
-                        related_str = "\n\n[관련 질문]\n" + "\n".join([f"- {q}" for q in related_questions])
-                    else:
-                        related_str = ""    
-                    yield answer + related_str + f"\n\n⏱ 처리 시간: {time.time() - start:.2f}초"
-                    break
-                elif data.get("type") == "final-error":
-                    yield data["answer"]
-                    break
-                elif data.get("type") == "error":
-                    yield f"에러: {data['content']}"
-                    break
-            except Exception as e:
-                print(f"[WebSocket] Error during receive: {e}")
-                yield f"WebSocket 에러: {e}"
+            token = ws.recv()
+            print(f"[WebSocket] Received token: {token}")
+            if token == "[END]":
                 break
+            collected.append(token)
+            yield "".join(collected)
+    except Exception as e:
+        print(f"[WebSocket] Error during receive: {e}")
+        yield f"WebSocket 에러: {e}"
     finally:
         ws_close(ws)
 
@@ -108,7 +101,6 @@ def check_session():
     try:
         resp = requests.get(SESSION_API_URL, cookies=None)
         if resp.status_code == 200:
-
             return f"{resp.json()['sessionid']}"
         else:
             return "세션 없음"
@@ -125,20 +117,10 @@ def new_session():
 
 demo = gr.Blocks()
 with demo:    
-    # sessionid = check_session()  # 💡 페이지 로드시 한 번만 실행됨
+    sessionid = new_session()  # 💡 페이지 로드시 한 번만 실행됨
     # clear_btn = gr.Button("이전 대화 기록 삭제")
-    # sessionid = gr.Markdown(f"현재 세션 ID: `{sessionid}`")  # 화면에 표시
-    # clear_btn.click(new_session, outputs=sessionid)
+    sessionid = gr.Markdown(f"현재 세션 ID: `{sessionid}`")  # 화면에 표시
 
-    sessionid_state = gr.State(new_session())  # 최초 세션ID
-    sessionid_display = gr.Markdown()          # 화면에 표시
-
-    def update_sessionid():
-        new_id = new_session()
-        return new_id, new_id  # state, display 둘 다 갱신
-
-    clear_btn = gr.Button("세션ID 새로고침")
-    clear_btn.click(update_sessionid, outputs=[sessionid_state, sessionid_display])
     gr.ChatInterface(
         fn=ws_chat_stream,
         title="스마트스토어 FAQ 챗봇",
