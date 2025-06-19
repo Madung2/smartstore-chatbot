@@ -14,12 +14,17 @@ services:
       - PYTHONUNBUFFERED=1
       - MILVUS_URL=standalone:19530
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - MQ_URL=amqp://guest:guest@rabbitmq:5672/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 20s
       retries: 3
       start_period: 20s
+    depends_on:
+      - redis
+      - rabbitmq
   
   gradio:
     image: smartstore-chatbot:1.0.0 # 리소스 조금더 쓰더라도 빠르게 fastapi RAG 호출하기 위해 같은 이미지 사용
@@ -29,10 +34,14 @@ services:
       - "7860:7860"
     depends_on:
       - api
+      - redis
+      - rabbitmq
     environment:
       - PYTHONUNBUFFERED=1
       - MILVUS_URL=standalone:19530
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - MQ_URL=amqp://guest:guest@rabbitmq:5672/
     volumes:
       - .:/app
     healthcheck:
@@ -41,6 +50,36 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  redis:
+    image: redis:7
+    container_name: smartstore-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./volumes/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: smartstore-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672" # 관리 UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - ./volumes/rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   etcd:
     container_name: milvus-etcd
@@ -109,12 +148,6 @@ services:
       - "8001:3000"
     depends_on:
       - standalone
-#  redis:
-#    image: redis:7
-#    ... (Redis 설정은 추후 추가)
-#  rabbitmq:
-#    image: rabbitmq:3-management
-#    ... (RabbitMQ 설정은 추후 추가)
 networks:
   default:
     name: milvus
