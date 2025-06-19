@@ -52,8 +52,9 @@ http://{ip}:8000/docs/
 > gradio
 http://{ip}:7860/?__theme=dark
 
+---
+# 1) 전체 구조 및 접근법
 
-### 1. 전체 구조 및 접근법
 ## 0. 파일 구조
 
 ```markdown
