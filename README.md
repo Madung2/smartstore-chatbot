@@ -36,11 +36,13 @@
 ---
 
 ## 2) 코드 실행방법
-### 0. 도커 환경
-### 1. 도커컴포즈 파일과 같은 위치에 .env 파일 생성 
-### 2. .env 파일에 "OPENAI_API_KEY=실제apikey" 를 입력한다.
-### 3. docker compose up -d 
-### 4. 아래 uri로 접근 가능
+
+```bash
+git clone https://github.com/Madung2/smartstore-chatbot.git
+cd smartstore-chatbot
+echo "OPENAI_API_KEY={실제apikey}" > .env
+docker compose up -d
+```
 
 > attu
 http://{ip}:8001
