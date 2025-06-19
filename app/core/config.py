@@ -9,6 +9,7 @@ VOLUME_ROOT = os.path.join(PROJECT_ROOT, "volumes")
 class Settings(BaseSettings):
     openai_api_key: str = None
     milvus_url: str = None
+    redis_url: str = None
     
     # 로그 설정
     log_dir: Path = os.path.join(VOLUME_ROOT, "logs")
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
         super().__init__()
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.milvus_url = os.getenv('MILVUS_URL')
+        self.redis_url = os.getenv('REDIS_URL')
         
         # 로그 디렉토리 생성
         os.makedirs(self.log_dir, exist_ok=True)

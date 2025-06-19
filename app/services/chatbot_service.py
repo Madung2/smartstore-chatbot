@@ -27,6 +27,7 @@ class RAGPipeline:
 
     async def _is_smartstore_question_llm(self, question: str) -> bool:
         prompt = self.classify_prompt.format(question=question)
+        print(f"[DEBUG] _is_smartstore_question_llm prompt: {prompt}")
         try:
             completion = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -34,32 +35,44 @@ class RAGPipeline:
                 temperature=0
             )
             answer = completion.choices[0].message.content.strip().upper()
+            print(f"[DEBUG] LLM classify answer: {answer}")
             return answer.startswith("Y")
         except Exception as e:
+            print(f"[DEBUG] LLM classify exception: {e}")
             return False
 
     async def _filter_question(self, question) -> bool:
+        print(f"[DEBUG] _filter_question called with: {question}")
         try:
-            return await self._is_smartstore_question_llm(question)
+            result = await self._is_smartstore_question_llm(question)
+            print(f"[DEBUG] _filter_question result: {result}")
+            return result
         except Exception as e:
+            print(f"[DEBUG] _filter_question exception: {e}")
             return False
 
     async def _embed_question(self, question) -> list[float]:
+        print(f"[DEBUG] _embed_question called with: {question}")
         try:
-            # OpenAIEmbedder가 동기라면 run_in_executor로 비동기화
             import asyncio
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, self.embedder.embed, question)
+            result = await loop.run_in_executor(None, self.embedder.embed, question)
+            print(f"[DEBUG] _embed_question result: {result[:5]}... (total {len(result)})")
+            return result
         except Exception as e:
+            print(f"[DEBUG] _embed_question exception: {e}")
             raise EmbeddingException(f"임베딩 실패: {e}")
 
     async def _search_similar_questions(self, query_vec, top_k) -> list[dict]:
+        print(f"[DEBUG] _search_similar_questions called with top_k={top_k}")
         try:
-            # SmartstoreMilvusRepo가 동기라면 run_in_executor로 비동기화
             import asyncio
             loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, self.milvus.search, query_vec, top_k)
+            result = await loop.run_in_executor(None, self.milvus.search, query_vec, top_k)
+            print(f"[DEBUG] _search_similar_questions result: {result}")
+            return result
         except Exception as e:
+            print(f"[DEBUG] _search_similar_questions exception: {e}")
             raise VectorDBException(f"벡터DB 검색 실패: {e}")
 
     async def _build_context(self, results):
@@ -100,8 +113,10 @@ class RAGPipeline:
             return []
 
     async def generate_answer(self, question, top_k=3):
+        print(f"[DEBUG] generate_answer called with: {question}")
         try:
             if not await self._filter_question(question):
+                print(f"[DEBUG] Question filtered out (not smartstore)")
                 return {
                     "answer": "스마트스토어 관련 질문만 답변할 수 있습니다.",
                     "similar_questions": [],
@@ -110,17 +125,22 @@ class RAGPipeline:
             query_vec = await self._embed_question(question)
             results = await self._search_similar_questions(query_vec, top_k=top_k)
             if not results:
+                print(f"[DEBUG] No similar questions found.")
                 return {"answer": "적절한 답변을 찾지 못했습니다.", "similar_questions": [], "followup_questions": []}
             context = await self._build_context(results)
             prompt = await self._build_prompt(context, question)
+            print(f"[DEBUG] LLM answer prompt: {prompt}")
             answer = await self._call_llm(prompt)
+            print(f"[DEBUG] LLM answer: {answer}")
             followup_questions = await self._generate_followup_questions(context)
+            print(f"[DEBUG] followup_questions: {followup_questions}")
             return {
                 "answer": answer,
                 "similar_questions": [r["question"] for r in results],
                 "followup_questions": followup_questions
             }
         except Exception as e:
+            print(f"[DEBUG] generate_answer exception: {e}")
             return {
                 "answer": f"RAG 파이프라인 처리 중 오류가 발생했습니다: {e}",
                 "similar_questions": [],
@@ -140,29 +160,33 @@ class RAGPipeline:
             raise LLMException(f"LLM 스트리밍 호출 실패: {e}")
 
     async def generate_answer_stream(self, question, top_k=3):
+        print(f"[DEBUG] generate_answer_stream called with: {question}")
         try:
-            #yield {"type": "debug", "content": "generate_answer_stream 진입"}
             yield {"type": "status", "content": "processing", "stage": "filtering"}
             if not await self._filter_question(question):
+                print(f"[DEBUG] Question filtered out (not smartstore) [stream]")
                 yield {
                     "type": "final-error",
                     "answer": "스마트스토어 관련 질문만 답변할 수 있습니다.",
                     "similar_questions": [],
                     "followup_questions": []
                 }
+                return
             yield {"type": "status", "content": "processing", "stage": "searching"}
             query_vec = await self._embed_question(question)
             results = await self._search_similar_questions(query_vec, top_k=top_k)
             if not results:
+                print(f"[DEBUG] No similar questions found. [stream]")
                 yield {
                     "type": "final-error",
                     "answer": "적절한 답변을 찾지 못했습니다.",
                     "similar_questions": [],
                     "followup_questions": []
                 }
+                return
             context = await self._build_context(results)
             prompt = await self._build_prompt(context, question)
-            #yield {"type": "status", "content": "processing", "stage": "generating"}
+            print(f"[DEBUG] LLM answer prompt [stream]: {prompt}")
             stream = await self._call_llm_stream(prompt)
             collected_answer = []
             async for chunk in stream:
@@ -173,8 +197,8 @@ class RAGPipeline:
                         "type": "token",
                         "content": content
                     }
-            #yield {"type": "status", "content": "processing", "stage": "followup"}
             followup_questions = await self._generate_followup_questions(context)
+            print(f"[DEBUG] followup_questions [stream]: {followup_questions}")
             yield {
                 "type": "final-success",
                 "answer": "".join(collected_answer),
@@ -182,7 +206,10 @@ class RAGPipeline:
                 "followup_questions": followup_questions
             }
         except Exception as e:
+            print(f"[DEBUG] generate_answer_stream exception: {e}")
             yield {
-                "type": "error",
-                "content": f"RAG 파이프라인 처리 중 오류가 발생했습니다: {e}"
+                "type": "final-error",
+                "answer": f"RAG 파이프라인 처리 중 오류가 발생했습니다: {e}",
+                "similar_questions": [],
+                "followup_questions": []
             }

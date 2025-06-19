@@ -2,12 +2,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.chatbot_service import RAGPipeline
 from typing import Dict, List
 import json
-
+import websocket
+from openai import AsyncOpenAI
 from app.core.config import settings
 from openai import OpenAI
 from app.core.logger import logger
 
 llm_client = OpenAI()
+async_llm_client = AsyncOpenAI()
 router = APIRouter(prefix="/chat")
 
 
@@ -20,7 +22,7 @@ def chat(question: str, top_k: int = 3):
 @router.websocket("/ws")
 async def ws_chat(websocket: WebSocket):
     await websocket.accept()
-    rag = RAGPipeline(llm_client)
+    rag = RAGPipeline()
     
     try:
         while True:
@@ -46,3 +48,10 @@ async def ws_chat(websocket: WebSocket):
             "content": f"Error processing request: {str(e)}"
         }
         await websocket.send_json(error_response)
+
+def ws_connect(url):
+    ws = websocket.create_connection(url)
+    return ws
+
+def ws_close(ws):
+    ws.close()
