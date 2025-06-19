@@ -1,54 +1,68 @@
 # 스마트스토어 RAG llm 챗봇
 
 ---
-# 질의응답 데모 
+## 1) 질의응답 데모 
 
+### 1. 판매자 등록 방법
 ![판매자 등록 방법](https://github.com/user-attachments/assets/adadca2b-5d06-4f17-a0ce-076baf20aed6)
-판매자 등록 방법
+
+---
+
+### 2. 배송조회
 
 ![배송조회](https://github.com/user-attachments/assets/0111fca5-6ba0-4a4a-9fb5-dceea3ee22f4)
-배송조회
+
+---
+
+
+### 3. 관련없는 질문
 
 ![관련없는질문](https://github.com/user-attachments/assets/1a0751a6-809d-4924-af01-3f5bb4abad29)
-관련없는 질문
+
+---
+
+
+### 4. 세션 기준으로 사용자 데이터 기억해 후속 응답
 
 ![상호명기억해후속응답](https://github.com/user-attachments/assets/133d9a0d-60b5-41be-aae8-c59a2b75f7dd)
-세션 기준으로 사용자 데이터 기억해 후속 응답
+
+---
 
 
+### 5. 백터db gui
 
-## 실행 명령어
+![백터db](https://github.com/user-attachments/assets/44d41e7b-4270-466b-a38e-e57925c711b7)
 
-![스크린샷 2025-06-17 오후 1 22 52](https://github.com/user-attachments/assets/4a7bb210-7f69-41f9-8243-8cc2937e4fdc)
+---
 
+## 2) 코드 실행방법
+### 0. 도커 환경
+### 1. 도커컴포즈 파일과 같은 위치에 .env 파일 생성 
+### 2. .env 파일에 "OPENAI_API_KEY=실제apikey" 를 입력한다.
+### 3. docker compose up -d 
+### 4. 아래 uri로 접근 가능
 
-
-```
-.env 파일에 OPENAI_API_KEY=실제apikey
-# 앱 실행
-docker compose up -d
-```
 > attu
-http://{해당 ip 혹은 도메인}:8001
+http://{ip}:8001
 Milvus Address= standalone:19530
 
 > fastapi
-http://{해당 ip 혹은 도메인}:8000/docs/
+http://{ip}:8000/docs/
 
 > gradio
-http://{해당 ip 혹은 도메인}:7860/?__theme=dark
+http://{ip}:7860/?__theme=dark
 
 
 ### 1. 전체 구조 및 접근법
 - **FastAPI**: 비동기 처리와 스트리밍(SSE, WebSocket)에 최적화된 프레임워크로, 챗봇 API 서버 구현에 사용.
-- **RAG (Retrieval-Augmented Generation)**: FAQ 데이터에서 임베딩을 생성하고, 사용자의 질문과 유사한 FAQ를 검색하여 LLM(OpenAI API)로 답변 생성.
-- **Milvus**: 벡터 DB로, FAQ 임베딩을 저장/검색. 도커 환경에서 Milvus, MinIO, etcd 등 포함하여 로컬에서 운영.
-- **Redis**: 세션/대화 기록 저장, 캐시, Pub/Sub 등 빠른 데이터 처리를 위한 인메모리 DB로 활용.
-- **RabbitMQ**: 임베딩 생성, LLM 호출 등 시간이 오래 걸리는 작업을 비동기 태스크로 분리하여 처리. (예: Celery 연동)
-- **대화 기록 저장**: Redis에 세션별 대화 기록 저장. 문맥 기반 답변 제공.
+- 전처리 : 데이터를 csv로 바꾸고  question -answer로 분리. question에 있는 태그는 임베딩시 유사도 처리에 더 적합하다 생각해서 그대로 나둠. 
+- **RAG (Retrieval-Augmented Generation)**: FAQ 데이터에서 임베딩을 생성하고, 사용자의 질문과 유사한 FAQ를 검색하여 LLM(OpenAI API)로 답변 생성.- >milvus에 question answer로 저장하고 question 을 기준으로 임베딩해서 불러옴.
+- **Milvus**: 벡터 DB로, FAQ 임베딩을 저장/검색. 도커 환경에서 Milvus, MinIO, etcd 등 포함하여 운영.
+- **Redis**: 세션/대화 기록 저장, 캐Pub/Sub 등 빠른 데이터 처리를 위한 인메모리 DB로 활용. 
+- **RabbitMQ**: 임베딩 생성, LLM 호출 등 시간이 오래 걸리는 작업을 비동기 태스크로 분리하여 처리.
+- **대화 기록 저장**: Redis에 세션별 대화 기록 저장. 문맥 기반 답변 제공. -> 유저가 콜하면 쿠키에 세션id를 저장하고 세션 id를 불러와
 - **스트리밍 응답**: FastAPI의 SSE(서버센트이벤트) 또는 WebSocket을 활용해 답변을 실시간으로 스트리밍.
-- **컨테이너화**: Docker로 전체 환경 구성. (Milvus, FastAPI, Redis, RabbitMQ, 기타 서비스)
-- **쿠버네티스 매니페스트**: 실제 배포 환경을 고려해 manifest 파일도 예시로 제공.
+- **컨테이너화**: Docker 컨테이너로 전체 환경 구성. (Milvus, FastAPI, Redis, RabbitMQ, 기타 서비스) 추후 분산화를 위해 쿠버네티스 환경 구성 가능.
 
 ### 2. 프로젝트 데이터 저장 및 성능 최적화 전략
 - **FAQ 데이터**: `final_result.pkl`을 파싱하여 텍스트와 메타데이터, 임베딩을 Milvus에 저장.
@@ -56,11 +70,15 @@ http://{해당 ip 혹은 도메인}:7860/?__theme=dark
 - **대화 기록**: 세션/유저별로 Redis에 저장. 빠른 조회와 문맥 유지.
 - **캐시**: 자주 조회되는 FAQ, 임베딩 결과 등을 Redis에 캐싱하여 응답 속도 향상.
 - **비동기 작업**: 임베딩 생성, LLM 호출 등은 RabbitMQ를 통해 워커에서 비동기로 처리하여 API 응답 지연 최소화.
-- **로그 및 모니터링**: API 호출, 검색, 답변 생성 등 주요 이벤트 로깅.
+- **로그 및 모니터링, 헬스체크 **: API 호출, 검색, 답변 생성 등 주요 이벤트 로깅.
+
+=> 여기서 래빗앰큐를 통해 비동기 처리 하려고 하였으나. 샐러리는 동기기반. 비동기로 작동이 어려워. 토큰 단위 리턴이 쉽지 않았음. => 토큰 단위 리턴을 유지하는게 llm 프로젝트 속도의 핵심.
+분산화 작업 한 뒤에 오히려 속도가 느려져서. 레빗엠큐와 샐러리를 제거했고. 해당 내용은 sync-streaming 브랜치에 코드 저장.
+따라서 레디스만 유지한 현재 아키텍쳐가 되었고. 대신 이 부분을 쿠버네티를 이용한 방법으로 추후에 해결하면 좋을것 같음.
 
 ### 3. 사용 모델
-- **OPENAI**: openai 모델 사용
-- **QWEN3-32B**: 파인튜닝 + RAG모델로 interchangable 방식으로 진행.
+- **OPENAI**: 현재 openai 모델 사용
+- **QWEN3-32B**: interchangable 방식으로 진행.
 
 ### 4. Step-by-Step 개발 계획
 1. **데이터 준비**
@@ -68,8 +86,8 @@ http://{해당 ip 혹은 도메인}:7860/?__theme=dark
     - [✔️] FAQ 임베딩 생성 및 Milvus에 저장
 2. **FastAPI 서버 구축**
     - [✔️] 기본 FastAPI 프로젝트 구조 생성
-    - [ ] SSE/WebSocket 기반 스트리밍 엔드포인트 구현
-    - [ ] 대화 기록 저장 로직(Backend: Redis) 구현
+    - [✔️] WebSocket 기반 스트리밍 엔드포인트 구현
+    - [✔️] 대화 기록 저장 로직(Backend: Redis) 구현 레디스에 
 3. **RAG 파이프라인 구현**
     - [✔️] 질문 임베딩 생성 (비동기: RabbitMQ)
     - [✔️] Milvus에서 유사 FAQ 검색
@@ -86,16 +104,7 @@ http://{해당 ip 혹은 도메인}:7860/?__theme=dark
     - [ ] (선택) K8s manifest 작성
     - [✔️] README/노션 문서 작성
 
-### 5. 오늘 할일 (1차 목표)
-- [✔️] FastAPI 기본 구조 생성
-- [✔️] `final_result.pkl` 데이터 파싱 코드 작성
-- [✔️] Milvus 도커 환경 세팅 및 연결 테스트
-- [ ] Redis 도커 환경 세팅 및 세션/캐시 구조 설계
-- [ ] RabbitMQ 도커 환경 세팅 및 비동기 태스크 샘플 구현
-- [✔️] 임베딩 생성 및 Milvus에 저장
-- [✔️] 간단한 FAQ 검색 API 구현 (임베딩 기반)
-- [ ] 대화 기록 저장 구조 설계 (Redis)
-- [ ] (시간되면) SSE 기반 스트리밍 응답 샘플 구현
+
 
 ### 6. 아키텍처
 
