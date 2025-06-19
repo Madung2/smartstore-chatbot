@@ -41,6 +41,7 @@
 git clone https://github.com/Madung2/smartstore-chatbot.git
 cd smartstore-chatbot
 echo "OPENAI_API_KEY={실제apikey}" > .env
+docker compose build
 docker compose up -d
 ```
 
