@@ -9,8 +9,11 @@ import requests
 llm_client = AsyncOpenAI()
 rag = RAGPipeline(llm_client)
 
-WS_API_URL = "ws://api:8000/chat/ws"  # 도커 네트워크에서 api 컨테이너 이름 사용
-HISTORY_API_URL = "http://api:8000/user/history"
+
+API_URL = "api:8000"
+WS_API_URL = f"ws://{API_URL}/chat/ws"
+SESSION_API_URL = f"http://{API_URL}/user/session"
+NEW_SESSION_API_URL = f"http://{API_URL}/user/new_session"
 
 def ws_connect():
     print("[WebSocket] Connecting to:", WS_API_URL)
@@ -84,34 +87,19 @@ def ws_chat_stream(message, history):
     finally:
         ws_close(ws)
 
-# JS 코드: 페이지 로드 시 /user/session 엔드포인트를 자동 호출
-auto_session_js = """
-(async () => {
-    try {
-        await fetch('/user/session', {credentials: 'include'});
-    } catch (e) {
-        // 무시
-    }
-})();
-"""
-
-def clear_history():
-    try:
-        resp = requests.delete(HISTORY_API_URL, cookies=None)
-        if resp.status_code == 200:
-            # JS로 새로고침 트리거
-            return gr.HTML("<script>location.reload();</script>")
-        else:
-            return gr.HTML("<span style='color:red'>이력 삭제 실패</span>")
-    except Exception as e:
-        return gr.HTML(f"<span style='color:red'>에러: {e}</span>")
+def new_session():
+    resp = requests.get(NEW_SESSION_API_URL, cookies=None)
+    if resp.status_code == 200:
+        return f"{resp.json()['sessionid']}"
+    else:
+        return "세션 생성 실패"
 
 demo = gr.Blocks()
 with demo:
-    clear_btn = gr.Button("이전 대화 기록 삭제")
-    clear_output = gr.HTML()
-    clear_btn.click(clear_history, outputs=clear_output)
-    gr.HTML(f"<script>{auto_session_js}</script>")
+    sessionid = new_session()  # 💡 페이지 로드시 한 번만 실행됨
+    # clear_btn = gr.Button("이전 대화 기록 삭제")
+    sessionid = gr.Markdown(f"현재 세션 ID: `{sessionid}`")  # 화면에 표시
+
     gr.ChatInterface(
         fn=ws_chat_stream,
         title="스마트스토어 FAQ 챗봇",
