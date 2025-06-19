@@ -54,127 +54,142 @@ http://{ip}:7860/?__theme=dark
 
 
 ### 1. 전체 구조 및 접근법
-- **FastAPI**: 비동기 처리와 스트리밍(SSE, WebSocket)에 최적화된 프레임워크로, 챗봇 API 서버 구현에 사용.
-- 전처리 : 데이터를 csv로 바꾸고  question -answer로 분리. question에 있는 태그는 임베딩시 유사도 처리에 더 적합하다 생각해서 그대로 나둠. 
-- **RAG (Retrieval-Augmented Generation)**: FAQ 데이터에서 임베딩을 생성하고, 사용자의 질문과 유사한 FAQ를 검색하여 LLM(OpenAI API)로 답변 생성.- >milvus에 question answer로 저장하고 question 을 기준으로 임베딩해서 불러옴.
-- **Milvus**: 벡터 DB로, FAQ 임베딩을 저장/검색. 도커 환경에서 Milvus, MinIO, etcd 등 포함하여 운영.
-- **Redis**: 세션/대화 기록 저장, 캐Pub/Sub 등 빠른 데이터 처리를 위한 인메모리 DB로 활용. 
-- **RabbitMQ**: 임베딩 생성, LLM 호출 등 시간이 오래 걸리는 작업을 비동기 태스크로 분리하여 처리.
-- **대화 기록 저장**: Redis에 세션별 대화 기록 저장. 문맥 기반 답변 제공. -> 유저가 콜하면 쿠키에 세션id를 저장하고 세션 id를 불러와
-- **스트리밍 응답**: FastAPI의 SSE(서버센트이벤트) 또는 WebSocket을 활용해 답변을 실시간으로 스트리밍.
-- **컨테이너화**: Docker 컨테이너로 전체 환경 구성. (Milvus, FastAPI, Redis, RabbitMQ, 기타 서비스) 추후 분산화를 위해 쿠버네티스 환경 구성 가능.
+## 0. 파일 구조
 
-### 2. 프로젝트 데이터 저장 및 성능 최적화 전략
-- **FAQ 데이터**: `final_result.pkl`을 파싱하여 텍스트와 메타데이터, 임베딩을 Milvus에 저장.
-- **임베딩 생성**: OpenAI 또는 Huggingface의 임베딩 모델 사용. (OpenAI 추천)
-- **대화 기록**: 세션/유저별로 Redis에 저장. 빠른 조회와 문맥 유지.
-- **캐시**: 자주 조회되는 FAQ, 임베딩 결과 등을 Redis에 캐싱하여 응답 속도 향상.
-- **비동기 작업**: 임베딩 생성, LLM 호출 등은 RabbitMQ를 통해 워커에서 비동기로 처리하여 API 응답 지연 최소화.
-- **로그 및 모니터링, 헬스체크 **: API 호출, 검색, 답변 생성 등 주요 이벤트 로깅.
+```markdown
 
-=> 여기서 래빗앰큐를 통해 비동기 처리 하려고 하였으나. 샐러리는 동기기반. 비동기로 작동이 어려워. 토큰 단위 리턴이 쉽지 않았음. => 토큰 단위 리턴을 유지하는게 llm 프로젝트 속도의 핵심.
-분산화 작업 한 뒤에 오히려 속도가 느려져서. 레빗엠큐와 샐러리를 제거했고. 해당 내용은 sync-streaming 브랜치에 코드 저장.
-따라서 레디스만 유지한 현재 아키텍쳐가 되었고. 대신 이 부분을 쿠버네티를 이용한 방법으로 추후에 해결하면 좋을것 같음.
-
-### 3. 사용 모델
-- **OPENAI**: 현재 openai 모델 사용
-- **QWEN3-32B**: interchangable 방식으로 진행.
-
-### 4. Step-by-Step 개발 계획
-1. **데이터 준비**
-    - [✔️] `final_result.pkl` 파싱 및 전처리
-    - [✔️] FAQ 임베딩 생성 및 Milvus에 저장
-2. **FastAPI 서버 구축**
-    - [✔️] 기본 FastAPI 프로젝트 구조 생성
-    - [✔️] WebSocket 기반 스트리밍 엔드포인트 구현
-    - [✔️] 대화 기록 저장 로직(Backend: Redis) 구현 레디스에 
-3. **RAG 파이프라인 구현**
-    - [✔️] 질문 임베딩 생성 (비동기: RabbitMQ)
-    - [✔️] Milvus에서 유사 FAQ 검색
-    - [✔️] LLM(OpenAI)로 답변 생성 (비동기: RabbitMQ)
-    - [ ] 스마트스토어 관련 없는 질문 필터링 로직 구현
-    - [ ] 추가 질문(추천 질문) 생성 로직 구현
-4. **성능 최적화 및 테스트**
-    - [ ] Redis 캐시 적용 및 조회 속도 테스트
-    - [ ] RabbitMQ 기반 비동기 태스크 처리 성능 측정
-    - [ ] 2가지 이상의 질의응답 시나리오 작성 및 테스트
-    - [ ] 데모 결과물 정리 (txt/png)
-5. **배포 및 문서화**
-    - [✔️] Dockerfile, docker-compose 작성 (Milvus, FastAPI, Redis, RabbitMQ 포함)
-    - [ ] (선택) K8s manifest 작성
-    - [✔️] README/노션 문서 작성
-
-
-
-### 6. 아키텍처
-
-
-![스크린샷 2025-06-16 오후 2 10 29](https://github.com/user-attachments/assets/8feca44a-3a1c-4b7a-8007-0a70bc3bc5e9)
-
-
-
-### 7. 디렉토릭 구조 (MVP - 유지보수 용이)
-
-smartstore-chatbot/
-```
-│
-├── app/
-│   ├── api/                # API 라우터 (엔드포인트)
-│   │   ├── __init__.py
-│   │   ├── chat.py         # /chat 관련 라우터
-│   │   └── health.py       # /health 등
-│   │
-│   ├── services/           # 비즈니스 로직 (챗봇, RAG, 임베딩 등)
-│   │   ├── __init__.py
-│   │   ├── preprocess.py
-│   │   ├── chatbot.py
-│   │   ├── rag.py
-│   │   ├── embedding.py
-│   │   └── session.py
-│   │
-│   ├── repositories/       # 데이터 접근 (Milvus, Redis, DB 등)
-│   │   ├── __init__.py
-│   │   ├── milvus_repo.py
-│   │   ├── redis_repo.py
-│   │   └── memory.py       # 임시/테스트용
-│   │
-│   ├── schemas/            # Pydantic 모델/스키마
-│   │   ├── __init__.py
-│   │   ├── chat.py
-│   │   └── faq.py
-│   │
-│   ├── workers/            # 비동기 작업/큐 (RabbitMQ, Celery 등)
-│   │   ├── __init__.py
-│   │   └── tasks.py
-│   │
-│   ├── core/               # 설정, 공통 유틸, 예외, 로깅 등
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── logger.py
-│   │   └── exceptions.py
-│   │ 
-│   ├──datasets/           # RAG 학습용 데이터셋
-│   │   ├── csv/
-│   │   └── pkl/
-│   ├── main.py             # FastAPI 엔트리포인트
-│   └── webui.py            # Gradio 등 웹UI
-│
-├── tests/                  # 테스트 코드
-│   ├── __init__.py
-│   └── test_chat.py
-│
+├── app
+│   ├── main.py
+│   ├── webui.py      # 그라지오 웹-ui
+│   ├── api/
+│   ├── core/
+│   ├── services/
+│   ├── repositories/
+│   ├── schemas/
+│   ├── utils/
+│   ├── workers/      # 
+├── datasets/
 ├── Dockerfile
+├── README.md
 ├── docker-compose.yml
+├── poetry.lock
 ├── pyproject.toml
-├── .gitignore
-├── .env
-└── README.md
-
+├── locust/
 ```
-           
-### 전처리
 
-1. column 정리
-column = category, question, answer, keyword
-2. 불필요한 문구 제거
-3. 불필요한 줄바꿈 제거
+## 1. 전체 구조 및 접근법
+
+### 핵심 프레임워크 및 기술 스택
+
+- **FastAPI**
+    
+    비동기 처리 및 **WebSocket** 기반 실시간 스트리밍에 최적화된 Python 웹 프레임워크로 챗봇 API 서버 구현에 사용.
+    
+- **RAG (Retrieval-Augmented Generation)**
+    
+    사용자의 질문에 대해 스마트스토어 FAQ 임베딩을 기반으로 유사 문서를 검색하고, 이를 LLM(OpenAI API)에 전달하여 자연스럽고 정확한 답변 생성.
+    
+- **Milvus**
+    
+    벡터 데이터베이스. FAQ 문서에서 추출한 질문-답변 쌍 중 `question`을 기준으로 임베딩을 생성해 저장.
+    
+    검색 시  L2 유클리드 함수로 확인된 유사 질문을 `VF_FLAT` 인덱스를 사용해 빠르게 찾아 RAG의 문맥으로 활용.
+    
+- **Redis**
+    
+    세션 관리 및 사용자별 대화 기록 저장, 캐싱, Pub/Sub 기능 등 다양한 용도로 사용.
+    
+    - 세션은 쿠키 기반 UUID로 식별
+    - 대화 내용은 `user:{session_id}:history` 형태로 저장
+- **RabbitMQ (초기 설계 시도)**
+    
+    LLM 호출 및 임베딩 생성 같은 시간이 오래 걸리는 작업을 워커에서 비동기로 처리하기 위해 도입.
+    
+    → 최종적으로 성능 저하 문제로 제거됨
+    
+
+---
+
+## 2. 프로젝트 데이터 처리 및 아키텍처 구성
+
+### FAQ 데이터 처리
+
+- `final_result.pkl` → CSV로 변환
+- 각 항목을 `question` - `answer` 형태로 분리
+- question에 포함된 카테고리 명은 검색 정확도를 위해 그대로 유지
+
+### 임베딩 생성 및 저장
+
+- OpenAI 사용,  Huggingface 기반 임베딩 모델 사용 가정하고 코드
+- 임베딩 결과는 Milvus에 저장 → 사용자 질문과 유사도 기준 검색
+
+### 대화 흐름 및 응답 처리
+
+- 사용자 질문 → Redis에 저장
+- 세션 ID로 문맥 유지
+- FastAPI 서버가 LLM(OpenAI) 호출 → `stream=True` 옵션 사용
+- 토큰 단위로 응답을 받아 WebSocket을 통해 실시간 전송
+
+---
+
+## 3. 성능 최적화 테스트 결과
+
+### 테스트 환경
+
+- 모델: OpenAI GPT-4 (streaming 사용)
+- 서버: FastAPI + WebSocket + Redis PubSub
+- FAQ 항목 수: 2,717개
+- Milvus 벡터 수: 2,717 vectors (question 기준)
+- 사용자 수: 10명 동시 접속 가정 (session ID 별 구분)
+
+### 테스트 방식
+
+- 동일 질문을 두 가지 방식으로 테스트:
+    - **현재 구조**: FastAPI + Redis 기반 스트리밍 구조
+    - **기존 구조**: RabbitMQ + Celery 기반 워커 구조
+
+### 주요 메트릭 비교 (단위: 초)
+
+| 질문 유형 | 현재 구조 (WebSocket stream) | RabbitMQ + Celery |
+| --- | --- | --- |
+| 배송 관련 질문 | 첫 토큰: 1.51 / 전체: 8.88 | 전체 응답: 19.74 |
+| 환불 관련 질문 | 첫 토큰: 1.99 / 전체: 14.22 | 전체 응답: 31.22 |
+| 판매자 등록 질문 | 첫 토큰: 1.53 / 전체: 10.60 | 전체 응답: 26.60 |
+
+> ✅ 현재 구조는 첫 토큰 응답 속도가 1.5초 내외로 매우 빠름,
+> 
+> 
+> ✅ 반면 MQ 구조에서는 **전체 응답을 받아야만 사용자에게 전송되므로 체감 속도 저하** 발생
+> 
+
+### 결론
+
+- **토큰 단위로 바로 사용자에게 응답이 전달되는 구조**가 체감 응답 속도를 획기적으로 높임
+- **RabbitMQ + Celery 구조는 스트리밍 대응이 어려워 제거**했으며,
+- 최종적으로 FastAPI + Redis 기반으로 구조를 단순화하고, 속도와 유지보수 측면에서 유리한 방향으로 전환
+
+---
+
+## 4. 향후 확장 계획
+
+- 현재 구조는 단일 노드에서도 충분히 작동 가능하며, 추후 확장성을 고려해 다음과 같은 분산 구성을 계획 중:
+
+| 구성 요소 | 설명 |
+| --- | --- |
+| FastAPI 서버 | WebSocket 연결 처리 / API 요청 수신 |
+| Redis | 세션 및 대화 기록 관리 / PubSub |
+| Milvus | 벡터 검색 (question 임베딩 기반) |
+| OpenAI API | LLM 응답 생성 |
+| Kubernetes (예정) | 전체 구성 요소를 파드 단위로 배포하여 수평 확장 |
+
+> 추후 쿠버네티스 기반 분산 환경 구성 시, 각 파드를 독립적으로 관리하며 동시에 다수의 사용자를 안정적으로 처리 가능
+> 
+
+---
+
+## 5. 결론
+
+- 초기에는 RabbitMQ + Celery 구조를 통해 작업 분리를 시도했으나, 토큰 단위 스트리밍이라는 실시간 응답 요구사항에는 맞지 않음
+- 구조 단순화를 통해 FastAPI + Redis 기반의 경량/고속 아키텍처로 전환함
+- 성능 테스트를 통해 **1.5초 이내 첫 토큰 응답**과 평균 **8~9초 내 전체 응답**이 가능함을 검증
+- 향후 쿠버네티스 기반의 확장형 배포로 전환 예정
