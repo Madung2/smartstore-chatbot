@@ -9,11 +9,13 @@ from app.core.logger import logger
 
 
 class EmbeddingPipeline:
-    def __init__(self, embedder=None, milvus_repo=None, batch_size=100, collection_name="smartstore_faq"):
+    def __init__(self, embedder=None, milvus_repo=None, batch_size=100, collection_name="smartstore_faq", data_dir="datasets/processed_csv"):
         self.embedder = embedder or OpenAIEmbedder(model="text-embedding-3-small")
         self.milvus = milvus_repo or SmartstoreMilvusRepo(collection_name=collection_name)
         self.batch_size = batch_size
+        self.data_dir = data_dir
 
+    @staticmethod
     def _build_embedding_input(question: str) -> str:
         """
         임베딩 입력 텍스트 생성 함수 (질문만 사용)
@@ -21,15 +23,22 @@ class EmbeddingPipeline:
         return f"{question.strip()}"
 
     def _load_dataframe(self, filename):
-        input_path = os.path.join("datasets/processed_csv", filename)
+        input_path = os.path.join(self.data_dir, filename)
         if not os.path.exists(input_path):
             raise HTTPException(status_code=404, detail="File not found")
         df = pd.read_csv(input_path)
         if "question" not in df.columns or "answer" not in df.columns:
-            raise HTTPException(status_code=400, detail="No 'question' or 'answer' column in CSV")
+            raise HTTPException(status_code=400, detail="question, answer 컬럼이 없습니다.")
         return df
 
-    def _preprocess_batch(self, df, start, end):
+    def _preprocess_batch(self, df, start, end) -> tuple[list[str], list[dict]]:
+        """
+        CSV 파일을 로드하고, question, answer 컬럼이 있는지 확인
+        Args:
+            filename (str): 파일 이름
+        Returns:
+            pd.DataFrame: 데이터프레임
+        """
         batch_inputs = []
         batch_metadatas = []
         for j in range(start, end):
@@ -48,8 +57,10 @@ class EmbeddingPipeline:
             })
         return batch_inputs, batch_metadatas
 
-    def _embed_and_insert(self, batch_inputs, batch_metadatas):
-        # 임베딩 및 insert를 배치 단위로 atomic하게 처리
+    def _embed_and_insert(self, batch_inputs, batch_metadatas) -> int:
+        """
+          임베딩 및 insert를 배치 단위로 atomic하게 처리
+        """
         while True:
             try:
                 batch_vectors = self.embedder.batch_embed(batch_inputs)
@@ -63,7 +74,14 @@ class EmbeddingPipeline:
         self.milvus.insert(batch_vectors, batch_metadatas)
         return len(batch_vectors)
 
-    def run(self, filename):
+    def run(self, filename) -> dict:
+        """
+        임베딩 및 insert 실행
+        Args:
+            filename (str): 파일 이름
+        Returns:
+            dict: 임베딩 결과
+        """
         df = self._load_dataframe(filename)
         total = len(df)
         inserted_count = 0

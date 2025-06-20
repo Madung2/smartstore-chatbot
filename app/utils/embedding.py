@@ -3,6 +3,13 @@ import os
 from app.core.config import settings
 
 class OpenAIEmbedder:
+    """
+    OpenAI Embedder
+    Args:
+        model (str): 사용할 모델 이름
+    Returns:
+        OpenAIEmbedder: OpenAI Embedder 인스턴스
+    """
     def __init__(self, model="text-embedding-3-small"):
         self.model = model
         self.client = OpenAI()  # 환경변수에서 API 키 자동 인식
