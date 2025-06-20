@@ -1,5 +1,7 @@
 ## 실행 명령어
 
+
+
 ![스크린샷 2025-06-17 오후 1 22 52](https://github.com/user-attachments/assets/4a7bb210-7f69-41f9-8243-8cc2937e4fdc)
 
 
@@ -49,16 +51,16 @@ http://{해당 ip 혹은 도메인}:7860/?__theme=dark
     - [✔️] FAQ 임베딩 생성 및 Milvus에 저장
 2. **FastAPI 서버 구축**
     - [✔️] 기본 FastAPI 프로젝트 구조 생성
-    - [ ] SSE/WebSocket 기반 스트리밍 엔드포인트 구현
-    - [ ] 대화 기록 저장 로직(Backend: Redis) 구현
+    - [✔️] WebSocket 기반 스트리밍 엔드포인트 구현
+    - [✔️] 대화 기록 저장 로직(Backend: Redis) 구현
 3. **RAG 파이프라인 구현**
     - [✔️] 질문 임베딩 생성 (비동기: RabbitMQ)
     - [✔️] Milvus에서 유사 FAQ 검색
     - [✔️] LLM(OpenAI)로 답변 생성 (비동기: RabbitMQ)
-    - [ ] 스마트스토어 관련 없는 질문 필터링 로직 구현
-    - [ ] 추가 질문(추천 질문) 생성 로직 구현
+    - [✔️] 스마트스토어 관련 없는 질문 필터링 로직 구현
+    - [✔️] 추가 질문(추천 질문) 생성 로직 구현
 4. **성능 최적화 및 테스트**
-    - [ ] Redis 캐시 적용 및 조회 속도 테스트
+    - [✔️] Redis 캐시 적용 및 조회 속도 테스트
     - [ ] RabbitMQ 기반 비동기 태스크 처리 성능 측정
     - [ ] 2가지 이상의 질의응답 시나리오 작성 및 테스트
     - [ ] 데모 결과물 정리 (txt/png)
@@ -71,12 +73,12 @@ http://{해당 ip 혹은 도메인}:7860/?__theme=dark
 - [✔️] FastAPI 기본 구조 생성
 - [✔️] `final_result.pkl` 데이터 파싱 코드 작성
 - [✔️] Milvus 도커 환경 세팅 및 연결 테스트
-- [ ] Redis 도커 환경 세팅 및 세션/캐시 구조 설계
+- [✔️] Redis 도커 환경 세팅 및 세션/캐시 구조 설계
 - [ ] RabbitMQ 도커 환경 세팅 및 비동기 태스크 샘플 구현
 - [✔️] 임베딩 생성 및 Milvus에 저장
 - [✔️] 간단한 FAQ 검색 API 구현 (임베딩 기반)
-- [ ] 대화 기록 저장 구조 설계 (Redis)
-- [ ] (시간되면) SSE 기반 스트리밍 응답 샘플 구현
+- [✔️] 대화 기록 저장 구조 설계 (Redis)
+- [ ] 웹소켓 기반 스트리밍 응답 샘플 구현
 
 ### 6. 아키텍처
 
@@ -147,6 +149,6 @@ smartstore-chatbot/
 ### 전처리
 
 1. column 정리
-column = category, question, answer, keyword
+column = question, answer, keyword
 2. 불필요한 문구 제거
 3. 불필요한 줄바꿈 제거
