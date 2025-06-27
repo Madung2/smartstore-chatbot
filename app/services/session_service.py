@@ -21,11 +21,11 @@ class SessionService:
         Returns:
             str: 세션 ID
         """
-        session_id = request.cookies.get("session_id")
+        session_id = request.cookies.get("sessionid")
         if not session_id:
             session_id = str(uuid.uuid4())
             if response is not None:
-                response.set_cookie(key="session_id", value=session_id, httponly=True)
+                response.set_cookie(key="sessionid", value=session_id, httponly=True)
         return session_id
 
     def get_history(self, session_id):

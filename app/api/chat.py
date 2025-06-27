@@ -19,10 +19,14 @@ def parse_ws_request(data: str) -> tuple[str, int]:
         request = json.loads(data)
         question = request.get("question", "")
         top_k = request.get("top_k", 3)
+        session_id = request.get("sessionid", "")
+        print(f"session_id: {session_id}")
+        return question, top_k, session_id
     except json.JSONDecodeError:
         question = data
         top_k = 3
-    return question, top_k
+        session_id = ""
+    return question, top_k, session_id
 
 
 async def stream_rag_response(rag, question, top_k, user_history, websocket, session_service, session_id):
@@ -45,12 +49,20 @@ def chat(question: str, top_k: int = 3):
 async def ws_chat(websocket: WebSocket):
     session_service = SessionService()
     await websocket.accept()
-    session_id = websocket.cookies.get("session_id")
+    session_id = websocket.cookies.get("sessionid")
     rag = RAGPipeline()
     try:
         while True:
             data = await websocket.receive_text()
-            question, top_k = parse_ws_request(data)
+            question, top_k, request_session_id = parse_ws_request(data)
+            
+            if request_session_id:
+                session_id = request_session_id
+            
+            if not session_id:
+                logger.warning("No session ID found")
+                session_id = "anonymous"
+            
             history = session_service.get_history(session_id)
             context = "\n".join(history[-5:]) if history else ""
             await stream_rag_response(rag, question, top_k, context, websocket, session_service, session_id)
