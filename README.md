@@ -62,6 +62,7 @@ http://{ip}:7860/?__theme=dark
 
 ```markdown
 
+<<<<<<< HEAD
 ├── app
 │   ├── main.py
 │   ├── webui.py      # 그라지오 웹-ui
@@ -73,6 +74,104 @@ http://{ip}:7860/?__theme=dark
 │   ├── utils/
 │   ├── workers/      # 
 ├── datasets/
+=======
+### 3. 사용 모델
+- **OPENAI**: openai 모델 사용
+- **QWEN3-32B**: 파인튜닝 + RAG모델로 interchangable 방식으로 진행.
+
+### 4. Step-by-Step 개발 계획
+1. **데이터 준비**
+    - [✔️] `final_result.pkl` 파싱 및 전처리
+    - [✔️] FAQ 임베딩 생성 및 Milvus에 저장
+2. **FastAPI 서버 구축**
+    - [✔️] 기본 FastAPI 프로젝트 구조 생성
+    - [✔️] WebSocket 기반 스트리밍 엔드포인트 구현
+    - [✔️] 대화 기록 저장 로직(Backend: Redis) 구현
+3. **RAG 파이프라인 구현**
+    - [✔️] 질문 임베딩 생성 (비동기: RabbitMQ)
+    - [✔️] Milvus에서 유사 FAQ 검색
+    - [✔️] LLM(OpenAI)로 답변 생성 (비동기: RabbitMQ)
+    - [✔️] 스마트스토어 관련 없는 질문 필터링 로직 구현
+    - [✔️] 추가 질문(추천 질문) 생성 로직 구현
+4. **성능 최적화 및 테스트**
+    - [✔️] Redis 캐시 적용 및 조회 속도 테스트
+    - [ ] RabbitMQ 기반 비동기 태스크 처리 성능 측정
+    - [ ] 2가지 이상의 질의응답 시나리오 작성 및 테스트
+    - [ ] 데모 결과물 정리 (txt/png)
+5. **배포 및 문서화**
+    - [✔️] Dockerfile, docker-compose 작성 (Milvus, FastAPI, Redis, RabbitMQ 포함)
+    - [ ] (선택) K8s manifest 작성
+    - [✔️] README/노션 문서 작성
+
+### 5. 오늘 할일 (1차 목표)
+- [✔️] FastAPI 기본 구조 생성
+- [✔️] `final_result.pkl` 데이터 파싱 코드 작성
+- [✔️] Milvus 도커 환경 세팅 및 연결 테스트
+- [✔️] Redis 도커 환경 세팅 및 세션/캐시 구조 설계
+- [ ] RabbitMQ 도커 환경 세팅 및 비동기 태스크 샘플 구현
+- [✔️] 임베딩 생성 및 Milvus에 저장
+- [✔️] 간단한 FAQ 검색 API 구현 (임베딩 기반)
+- [✔️] 대화 기록 저장 구조 설계 (Redis)
+- [ ] 웹소켓 기반 스트리밍 응답 샘플 구현
+
+### 6. 아키텍처
+
+
+![스크린샷 2025-06-16 오후 2 10 29](https://github.com/user-attachments/assets/8feca44a-3a1c-4b7a-8007-0a70bc3bc5e9)
+
+
+
+### 7. 디렉토릭 구조 (MVP - 유지보수 용이)
+
+smartstore-chatbot/
+```
+│
+├── app/
+│   ├── api/                # API 라우터 (엔드포인트)
+│   │   ├── __init__.py
+│   │   ├── chat.py         # /chat 관련 라우터
+│   │   └── health.py       # /health 등
+│   │
+│   ├── services/           # 비즈니스 로직 (챗봇, RAG, 임베딩 등)
+│   │   ├── __init__.py
+│   │   ├── preprocess.py
+│   │   ├── chatbot.py
+│   │   ├── rag.py
+│   │   ├── embedding.py
+│   │   └── session.py
+│   │
+│   ├── repositories/       # 데이터 접근 (Milvus, Redis, DB 등)
+│   │   ├── __init__.py
+│   │   ├── milvus_repo.py
+│   │   ├── redis_repo.py
+│   │   └── memory.py       # 임시/테스트용
+│   │
+│   ├── schemas/            # Pydantic 모델/스키마
+│   │   ├── __init__.py
+│   │   ├── chat.py
+│   │   └── faq.py
+│   │
+│   ├── workers/            # 비동기 작업/큐 (RabbitMQ, Celery 등)
+│   │   ├── __init__.py
+│   │   └── tasks.py
+│   │
+│   ├── core/               # 설정, 공통 유틸, 예외, 로깅 등
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── logger.py
+│   │   └── exceptions.py
+│   │ 
+│   ├──datasets/           # RAG 학습용 데이터셋
+│   │   ├── csv/
+│   │   └── pkl/
+│   ├── main.py             # FastAPI 엔트리포인트
+│   └── webui.py            # Gradio 등 웹UI
+│
+├── tests/                  # 테스트 코드
+│   ├── __init__.py
+│   └── test_chat.py
+│
+>>>>>>> 8cca047d9a59ba0f7fcc408c70d934c55d369a8d
 ├── Dockerfile
 ├── README.md
 ├── docker-compose.yml
@@ -81,6 +180,7 @@ http://{ip}:7860/?__theme=dark
 ├── locust/
 ```
 
+<<<<<<< HEAD
 ## 1. 전체 구조 및 접근법
 
 ### 핵심 프레임워크 및 기술 스택
@@ -187,7 +287,8 @@ http://{ip}:7860/?__theme=dark
 | Kubernetes (예정) | 전체 구성 요소를 파드 단위로 배포하여 수평 확장 |
 
 > 추후 쿠버네티스 기반 분산 환경 구성 시, 각 파드를 독립적으로 관리하며 동시에 다수의 사용자를 안정적으로 처리 가능
-> 
+> llm 모델 직접 사용
+> gRPC 분산화 함께 고려
 
 ---
 
@@ -197,3 +298,9 @@ http://{ip}:7860/?__theme=dark
 - 구조 단순화를 통해 FastAPI + Redis 기반의 경량/고속 아키텍처로 전환함
 - 성능 테스트를 통해 **1.5초 이내 첫 토큰 응답**과 평균 **8~9초 내 전체 응답**이 가능함을 검증
 - 향후 쿠버네티스 기반의 확장형 배포로 전환 예정
+=======
+1. column 정리
+column = question, answer, keyword
+2. 불필요한 문구 제거
+3. 불필요한 줄바꿈 제거
+>>>>>>> 8cca047d9a59ba0f7fcc408c70d934c55d369a8d
