@@ -2,6 +2,7 @@ from app.utils.embedding import OpenAIEmbedder
 from app.repositories.milvus_repo import SmartstoreMilvusRepo
 from openai import AsyncOpenAI
 from app.core.exceptions import *
+from app.core import prompts
 
 class RAGPipeline:
     def __init__(self, llm_client=None, embedder=None, milvus_repo=None, collection_name="smartstore_faq"):
@@ -9,24 +10,8 @@ class RAGPipeline:
         self.embedder = embedder or OpenAIEmbedder(model="text-embedding-3-small")
         self.milvus = milvus_repo or SmartstoreMilvusRepo(collection_name=collection_name)
 
-        # 프롬프트 템플릿들
-        self.classify_prompt = (
-            "너는 네이버 스마트스토어 FAQ 챗봇의 질문 분류기야.\n"
-            "아래 사용자의 질문이 '네이버 스마트스토어'와 직접적으로 관련된 질문이면 'Y', 아니면 'N'만 답변해.\n\n"
-            "질문: {question}\n답변:\n"
-        )
-        self.answer_prompt = (
-            "당신은 네이버 스마트스토어GIT FAQ 상담원입니다.\n\n"
-            "아래는 자주 묻는 질문과 답변입니다:\n\n{context}\n\n"
-            "이제 사용자의 질문에 답해주세요:\nQ: {question}\nA:"
-        )
-        self.followup_prompt = (
-            "다음은 스마트스토어 FAQ입니다:\n\n{context}\n\n"
-            "위 내용을 참고하여, 사용자가 추가로 궁금해할 만한 내용을 챗봇이 직접 질문하는 형태(예: '- 등록에 필요한 서류 안내해드릴까요?')로 2개 제안해줘. 반드시 '- '로 시작하는 한글 질문 형태로만 답변해. 반드시 관련있는 질문이어야 하고 끝에는 물음표(?) 를 붙일것"
-        )
-
     async def _is_smartstore_question_llm(self, question: str) -> bool:
-        prompt = self.classify_prompt.format(question=question)
+        prompt = prompts.CLASSIFY_PROMPT.format(question=question)
         print(f"[DEBUG] _is_smartstore_question_llm prompt: {prompt}")
         try:
             completion = await self.llm_client.chat.completions.create(
@@ -83,7 +68,7 @@ class RAGPipeline:
 
     async def _build_prompt(self, context, question):
         try:
-            return self.answer_prompt.format(context=context, question=question)
+            return prompts.ANSWER_PROMPT.format(context=context, question=question)
         except Exception as e:
             raise PipelineException(f"프롬프트 생성 실패: {e}")
 
@@ -100,7 +85,7 @@ class RAGPipeline:
 
     async def _generate_followup_questions(self, context):
         try:
-            prompt = self.followup_prompt.format(context=context)
+            prompt = prompts.FOLLOWUP_PROMPT.format(context=context)
             followup_completion = await self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
