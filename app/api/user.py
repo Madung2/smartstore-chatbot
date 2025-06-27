@@ -6,7 +6,7 @@ session_service = SessionService()
 
 @router.get("/history")
 async def get_history(request: Request):
-    sessionid = session_service.get_or_create_sessionid(request)
+    sessionid = session_service.get_or_create_session_id(request)
     return session_service.get_history(sessionid)
 
 @router.get("/session")
