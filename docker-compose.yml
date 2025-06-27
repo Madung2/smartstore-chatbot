@@ -148,18 +148,7 @@ services:
       - "8001:3000"
     depends_on:
       - standalone
-  # locust:
-  #   image: locustio/locust:latest
-  #   container_name: smartstore-locust
-  #   volumes:
-  #     - ./locust:/mnt/locust  # locustfile.py 등 테스트 코드 마운트
-  #   command: >
-  #     -f /mnt/locust/locustfile.py
-  #     --host http://api:8000
-  #   depends_on:
-  #     - api
-  #   ports:
-  #     - "8089:8089"  # Locust 웹 UI
+
 networks:
   default:
     name: milvus
