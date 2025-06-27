@@ -1,4 +1,9 @@
 # 스마트스토어 RAG llm 챗봇
+---
+- Github 링크: https://github.com/Madung2/smartstore-chatbot
+- 챗봇: https://www.chat-smartstore-demo.co.kr/
+- 백터 DB: https://db.chat-smartstore-demo.co.kr/
+- fastapi 스웨거: https://api.chat-smartstore-demo.co.kr/docs
 
 ---
 ## 1) 질의응답 데모 
