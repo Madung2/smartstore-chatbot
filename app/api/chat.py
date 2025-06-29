@@ -39,11 +39,6 @@ async def stream_rag_response(rag, question, top_k, user_history, websocket, ses
             pass
 
 
-@router.post("/")
-def chat(question: str, top_k: int = 3):
-    rag = RAGPipeline(llm_client)
-    return rag.generate_answer(question, top_k)
-
 
 @router.websocket("/ws")
 async def ws_chat(websocket: WebSocket):
