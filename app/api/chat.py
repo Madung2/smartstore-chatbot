@@ -44,7 +44,6 @@ async def stream_rag_response(rag, question, top_k, user_history, websocket, ses
 async def ws_chat(websocket: WebSocket):
     session_service = SessionService()
     await websocket.accept()
-    session_id = websocket.cookies.get("sessionid")
     rag = RAGPipeline()
     try:
         while True:
@@ -53,12 +52,14 @@ async def ws_chat(websocket: WebSocket):
             
             if request_session_id:
                 session_id = request_session_id
+                history = session_service.get_history(session_id)
             
             if not session_id:
                 logger.warning("No session ID found")
-                session_id = "anonymous"
+                history = ''
+                # session_id = ""
             
-            history = session_service.get_history(session_id)
+            
             context = "\n".join(history[-5:]) if history else ""
             await stream_rag_response(rag, question, top_k, context, websocket, session_service, session_id)
     except WebSocketDisconnect:
